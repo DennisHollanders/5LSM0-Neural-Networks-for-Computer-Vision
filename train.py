@@ -21,7 +21,7 @@ def get_arg_parser():
 
     # Detect the running environment
     run_env = os.getenv('RUN_ENV', 'Computer-Vision')
-
+    print("run_env=", run_env)
     if run_env == 'Computer-Vision':
         default_data_path = "City_Scapes/"
         default_batch_size = 4
@@ -66,7 +66,6 @@ def main(args):
         transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
         transforms.PILToTensor(),
     ])
-
     # Define the datasets
     training_data = Cityscapes(root=args.data_path, split='train', mode='fine', target_type='semantic',
                                transform=transform, target_transform=target_transform)
@@ -91,7 +90,7 @@ def main(args):
     print('input shape:',inputs.shape,'labels:', targets.shape)
 
     # define model
-    model = Model()
+    model = Model().cuda()
     criterion = DiceLoss(eps=1.0, activation=None)
     optimizer = optim.Adam(model.parameters())
     num_epochs = args.num_epochs
