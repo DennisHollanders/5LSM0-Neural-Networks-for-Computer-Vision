@@ -20,7 +20,7 @@ def get_arg_parser():
     parser = ArgumentParser()
 
     # Detect the running environment
-    run_env = os.getenv('RUN_ENV', 'Computer-Vision')
+    run_env = os.getenv('RUN_ENV', 'Computer-Vision',)
     print("run_env=", run_env)
     if run_env == 'Computer-Vision':
         default_data_path = "City_Scapes/"
