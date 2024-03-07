@@ -14,6 +14,8 @@ from argparse import ArgumentParser
 from helper import *
 import collections
 from model import Model
+import wandb
+
 def get_arg_parser():
     parser = ArgumentParser()
 
@@ -39,6 +41,20 @@ def get_arg_parser():
     return parser
 
 def main(args):
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="5LSM0",
+        # track hyperparameters and run metadata
+        config={
+            "learning_rate": 0.02,
+            "architecture": "Initial architecture",
+            "dataset": "CityScapes",
+            "epochs": args.num_epochs,
+            "optimizer":"Adam",
+            "batch_size":args.batch_size,
+            "Image size": args.resize,
+        }
+    )
     """define your model, trainingsloop optimitzer etc. here"""
     transform = transforms.Compose([
         transforms.Resize(args.resize),
@@ -72,10 +88,10 @@ def main(args):
     first_batch = next(data_iterator)
     inputs, targets = first_batch
 
-    print(inputs.shape, targets.shape)
+    print('input shape:',inputs.shape,'labels:', targets.shape)
 
     # define model
-    model = Model() #.cuda()
+    model = Model()
     criterion = DiceLoss(eps=1.0, activation=None)
     optimizer = optim.Adam(model.parameters())
     num_epochs = args.num_epochs
@@ -118,6 +134,7 @@ def main(args):
         'num_epochs': num_epochs,
     }
 
+    wandb.log(state)
     torch.save(state, 'model_and_training_state.pth')
 
 
