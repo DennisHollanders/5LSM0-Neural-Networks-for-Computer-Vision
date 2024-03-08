@@ -20,7 +20,7 @@ def get_arg_parser():
     parser = ArgumentParser()
 
     # Detect the running environment
-    run_env = os.getenv('RUN_ENV', 'Computer-Vision',)
+    run_env = os.getenv('RUN_ENV', 'Computer-Vision')
     print("run_env=", run_env)
     if run_env == 'Computer-Vision':
         default_data_path = "City_Scapes/"
@@ -69,28 +69,32 @@ def main(args):
     # Define the datasets
     training_data = Cityscapes(root=args.data_path, split='train', mode='fine', target_type='semantic',
                                transform=transform, target_transform=target_transform)
+    """
     val_data = Cityscapes(root=args.data_path, split='val', mode='fine', target_type='semantic',
                              transform=transform, target_transform=target_transform)
-
-    train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=True)
 
-    """apply checks"""
-    #print('train_loader mean,std',calculate_mean_std(train_loader))
-    #print('val_loader mean,std', calculate_mean_std(val_loader))
+    """
+    train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True)
 
-    # visualize samples to confirm functionality.
-    #visualize_samples(train_loader, 4)
-    #visualize_samples(val_loader, 4)
+
+    """apply checks"""
+    """
+    print('train_loader mean,std',calculate_mean_std(train_loader))
+    print('val_loader mean,std', calculate_mean_std(val_loader))
+
+    visualize samples to confirm functionality.
+    visualize_samples(train_loader, 4)
+    visualize_samples(val_loader, 4)
 
     data_iterator = iter(train_loader)
     first_batch = next(data_iterator)
     inputs, targets = first_batch
 
     print('input shape:',inputs.shape,'labels:', targets.shape)
+    """
+    model = Model()
 
-    # define model
-    model = Model().cuda()
     criterion = DiceLoss(eps=1.0, activation=None)
     optimizer = optim.Adam(model.parameters())
     num_epochs = args.num_epochs
@@ -100,6 +104,12 @@ def main(args):
     for epoch in range(num_epochs):
         running_loss = 0.0
         for i, (inputs, labels) in enumerate(train_loader):
+            if torch.cuda.is_available():
+                model.cuda()
+                inputs = inputs.cuda()
+            else:
+                model.cpu()
+                inputs = inputs.cpu()
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs,labels)
@@ -111,7 +121,7 @@ def main(args):
         epoch_loss = running_loss/len(train_loader)
 
         epoch_data['loss'].append(epoch_loss)
-
+        """
         model.eval()
         running_loss = 0.0
         for inputs,labels in val_loader:
@@ -123,7 +133,7 @@ def main(args):
         epoch_data['validation_loss'].append(validation_loss)
 
         print(f"Epoch [{epoch + 1}/{num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
-
+    """
     #torch.save(model.state_dict(), 'saved_model.pth')
     state = {
         'model_state_dict': model.state_dict(),
