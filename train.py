@@ -15,6 +15,7 @@ from helper import *
 import collections
 from model import Model
 import wandb
+from torch.utils.data import random_split
 
 def get_arg_parser():
     parser = ArgumentParser()
@@ -69,12 +70,13 @@ def main(args):
         transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
         transforms.PILToTensor(),
     ])
-    # Define the datasets
+
     full_training_data = Cityscapes(root=args.data_path, split='train', mode='fine', target_type='semantic',
                                     transform=transform, target_transform=target_transform)
-
-    train_size = len(full_training_data) * (1-val_size)
-    training_data, validation_data = full_training_data[:train_size], full_training_data[train_size:]
+    total_size = len(full_training_data)
+    train_size = int(0.8 * total_size)
+    val_size = total_size - train_size
+    training_data, validation_data = random_split(full_training_data, [train_size, val_size])
 
     # Create DataLoaders for training and validation sets
     train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, num_workers=8)
