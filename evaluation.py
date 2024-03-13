@@ -15,11 +15,11 @@ def main():
 
     # Prepare the dataset and DataLoader
     transform = transforms.Compose([
-       # transforms.Resize(args.resize),
+        transforms.Resize((256, 512)),
         transforms.ToTensor(),
     ])
     target_transform = transforms.Compose([
-        #transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
+        transforms.Resize((256, 512), interpolation=transforms.InterpolationMode.NEAREST),
         transforms.PILToTensor(),
     ])
     dataset = Cityscapes(root='City_Scapes/', split='val', mode='fine', target_type='semantic',

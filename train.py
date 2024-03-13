@@ -21,19 +21,19 @@ def get_arg_parser():
     parser = ArgumentParser()
 
     # Detect the running environment
-    #run_env = os.getenv('RUN_ENV', 'Computer-Vision')
-    #print("run_env=", run_env)
-    #if run_env == 'Computer-Vision':
-    #    default_data_path = "City_Scapes/"
-    #    default_batch_size = 4
-    #    default_num_epochs = 1
-    #    default_resize = (64,64)
+    run_env = os.getenv('RUN_ENV', 'Computer-Vision')
+    print("run_env=", run_env)
+    if run_env == 'Computer-Vision':
+        default_data_path = "City_Scapes/"
+        default_batch_size = 4
+        default_num_epochs = 1
+        default_resize = (64,64)
 
-    #else:
-    default_data_path = "/gpfs/work5/0/jhstue005/JHS_data/CityScapes"
-    default_batch_size = 16
-    default_num_epochs = 5
-    default_resize = (256, 512)
+    else:
+        default_data_path = "/gpfs/work5/0/jhstue005/JHS_data/CityScapes"
+        default_batch_size = 16
+        default_num_epochs = 5
+        default_resize = (256, 512)
 
 
     parser.add_argument("--data_path", type=str, default=default_data_path, help="Path to the data")
@@ -130,6 +130,12 @@ def main(args):
         model.eval()
         running_loss = 0.0
         for inputs,labels in val_loader:
+            if torch.cuda.is_available():
+                inputs = inputs.cuda()
+                labels = labels.cuda()
+            else:
+                inputs = inputs.cpu()
+                labels = labels.cpu()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             running_loss += loss.item()
