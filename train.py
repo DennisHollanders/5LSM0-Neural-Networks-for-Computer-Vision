@@ -30,9 +30,10 @@ def get_arg_parser():
 
     else:
         default_data_path = "/gpfs/work5/0/jhstue005/JHS_data/CityScapes"
-        default_batch_size = 64
-        default_num_epochs = 20
-        default_resize = (1024, 2048)
+        default_batch_size = 16
+        default_num_epochs = 5
+        default_resize = (256, 512)
+
 
     parser.add_argument("--data_path", type=str, default=default_data_path, help="Path to the data")
     parser.add_argument("--batch_size", type=int, default=default_batch_size, help="Batch size for training")
@@ -41,12 +42,14 @@ def get_arg_parser():
     return parser
 
 def main(args):
+    Learning_rate = 0.02
+    val_size = 0.2
     wandb.init(
         # set the wandb project where this run will be logged
         project="5LSM0",
         # track hyperparameters and run metadata
         config={
-            "learning_rate": 0.02,
+            "learning_rate": Learning_rate,
             "architecture": "Initial architecture",
             "dataset": "CityScapes",
             "epochs": args.num_epochs,
@@ -67,16 +70,15 @@ def main(args):
         transforms.PILToTensor(),
     ])
     # Define the datasets
-    training_data = Cityscapes(root=args.data_path, split='train', mode='fine', target_type='semantic',
-                               transform=transform, target_transform=target_transform)
-    """
-    val_data = Cityscapes(root=args.data_path, split='val', mode='fine', target_type='semantic',
-                             transform=transform, target_transform=target_transform)
-    val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=True)
+    full_training_data = Cityscapes(root=args.data_path, split='train', mode='fine', target_type='semantic',
+                                    transform=transform, target_transform=target_transform)
 
-    """
-    train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True)
+    train_size = len(full_training_data) * (1-val_size)
+    training_data, validation_data = full_training_data[:train_size], full_training_data[train_size:]
 
+    # Create DataLoaders for training and validation sets
+    train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, num_workers=8)
+    val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, num_workers=8)
 
     """apply checks"""
     """
@@ -94,9 +96,10 @@ def main(args):
     print('input shape:',inputs.shape,'labels:', targets.shape)
     """
     model = Model()
+    model.cuda() if torch.cuda.is_available() else model.cpu()
 
     criterion = DiceLoss(eps=1.0, activation=None)
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=Learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     num_epochs = args.num_epochs
 
     epoch_data = collections.defaultdict(list)
@@ -105,11 +108,11 @@ def main(args):
         running_loss = 0.0
         for i, (inputs, labels) in enumerate(train_loader):
             if torch.cuda.is_available():
-                model.cuda()
                 inputs = inputs.cuda()
+                labels = labels.cuda()
             else:
-                model.cpu()
                 inputs = inputs.cpu()
+                labels = labels.cpu()
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs,labels)
@@ -118,10 +121,10 @@ def main(args):
             running_loss += loss.item()
             print('train iteration:', i)
 
+        print('Epoch:',epoch)
         epoch_loss = running_loss/len(train_loader)
-
         epoch_data['loss'].append(epoch_loss)
-        """
+
         model.eval()
         running_loss = 0.0
         for inputs,labels in val_loader:
@@ -133,7 +136,7 @@ def main(args):
         epoch_data['validation_loss'].append(validation_loss)
 
         print(f"Epoch [{epoch + 1}/{num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
-    """
+
     #torch.save(model.state_dict(), 'saved_model.pth')
     state = {
         'model_state_dict': model.state_dict(),
@@ -144,7 +147,12 @@ def main(args):
     }
 
     wandb.log(state)
-    torch.save(state, 'model_and_training_state.pth')
+
+    try:
+        slurm_job_id = os.environ.get('SLURM_JOB_ID', 'default_job_id')
+        torch.save(state, f'model_{slurm_job_id}.pth')
+    except:
+        torch.save(state, f'model.pth')
 
 
 if __name__ == "__main__":
