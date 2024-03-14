@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 from helper import *
 from model import Model
 
-model_path = 'model_5535610.pth'
+model_path = 'model_5536669.pth'
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

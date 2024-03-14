@@ -43,7 +43,7 @@ def get_arg_parser():
     return parser
 
 def main(args):
-    LEARNING_RATE = 0.02
+    LEARNING_RATE = 5e-5
     VAL_SIZE = 0.2
     NUM_CLASSES = 34
 
@@ -90,7 +90,7 @@ def main(args):
     initialize_weights(model)
     criterion = DiceLoss()
     #criterion = MulticlassJaccardIndex(num_classes=34)
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
     num_epochs = args.num_epochs
 
     epoch_data = collections.defaultdict(list)
