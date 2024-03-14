@@ -20,7 +20,7 @@ class OneHotEncode(torch.nn.Module):
         one_hot = one_hot.scatter_(0, label.unsqueeze(0), 1)  # Convert to one-hot [C, H, W]
         return one_hot
 
-"""
+
 class DiceLoss(nn.Module):
     def __init__(self, weight=None, size_average=True):
         super(DiceLoss, self).__init__()
@@ -36,9 +36,10 @@ class DiceLoss(nn.Module):
         intersection = (inputs * targets).sum()
         dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
 
-        return 1 - dice"""
+        return 1 - dice
+"""
 def f_score(pr, gt, beta=1, eps=1e-7, threshold=None, activation='sigmoid'):
-    """
+    
     Args:
         pr (torch.Tensor): A list of predicted elements
         gt (torch.Tensor):  A list of elements that are to be predicted
@@ -46,7 +47,7 @@ def f_score(pr, gt, beta=1, eps=1e-7, threshold=None, activation='sigmoid'):
         threshold: threshold for outputs binarization
     Returns:
         float: IoU (Jaccard) score
-    """
+    
 
     if activation is None or activation == "none":
         activation_fn = lambda x: x
@@ -85,4 +86,22 @@ class DiceLoss(nn.Module):
         return 1 - f_score(y_pr, y_gt, beta=1.,
                            eps=self.eps, threshold=None,
                            activation=self.activation)
+"""
+def print_gradients(model):
+    for name, parameter in model.named_parameters():
+        if parameter.grad is not None:
+            print(
+                f"{name} gradient: max {parameter.grad.data.abs().max()} | mean {parameter.grad.data.abs().mean()}")
+        else:
+            print(f"{name} has no gradient")
+
+def initialize_weights(model):
+    for module in model.modules():
+        if isinstance(module, (nn.Conv2d, nn.Linear)):
+            nn.init.xavier_uniform_(module.weight)
+            if module.bias is not None:
+                nn.init.constant_(module.bias, 0)
+        elif isinstance(module, nn.BatchNorm2d):
+            nn.init.constant_(module.weight, 1)
+            nn.init.constant_(module.bias, 0)
 

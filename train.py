@@ -22,19 +22,18 @@ def get_arg_parser():
     parser = ArgumentParser()
 
     # Detect the running environment
-    run_env = os.getenv('RUN_ENV', 'Computer-Vision')
-    print("run_env=", run_env)
-    if run_env == 'Computer-Vision':
-        default_data_path = "City_Scapes/"
-        default_batch_size = 4
-        default_num_epochs = 1
-        default_resize = (32,32)
-
-    else:
+    if 'SLURM_JOB_ID' in os.environ:
+        # We're likely running on a server with SLURM
         default_data_path = "/gpfs/work5/0/jhstue005/JHS_data/CityScapes"
         default_batch_size = 16
         default_num_epochs = 5
         default_resize = (256, 512)
+    else:
+        # We're likely running in a local environment
+        default_data_path = "City_Scapes/"
+        default_batch_size = 4
+        default_num_epochs = 1
+        default_resize = (32, 32)
 
 
     parser.add_argument("--data_path", type=str, default=default_data_path, help="Path to the data")
@@ -86,24 +85,9 @@ def main(args):
     train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, num_workers=8)
     val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, num_workers=8)
 
-    """apply checks"""
-    """
-    print('train_loader mean,std',calculate_mean_std(train_loader))
-    print('val_loader mean,std', calculate_mean_std(val_loader))
-
-    visualize samples to confirm functionality.
-    visualize_samples(train_loader, 4)
-    visualize_samples(val_loader, 4)
-
-    data_iterator = iter(train_loader)
-    first_batch = next(data_iterator)
-    inputs, targets = first_batch
-
-    print('input shape:',inputs.shape,'labels:', targets.shape)
-    """
     model = Model()
     model.cuda() if torch.cuda.is_available() else model.cpu()
-
+    initialize_weights(model)
     criterion = DiceLoss()
     #criterion = MulticlassJaccardIndex(num_classes=34)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
@@ -134,6 +118,7 @@ def main(args):
 
             loss = criterion(outputs,labels)
             loss.backward()
+            #print_gradients(model)
             optimizer.step()
             running_loss += loss.item()
 
@@ -151,13 +136,7 @@ def main(args):
                 inputs = inputs.cpu()
                 labels = labels.cpu()
             outputs = model(inputs)
-
-            print(labels.size(), inputs.size(), outputs.size())
-            print(len(torch.unique(labels)))
-            predicted_classes = torch.argmax(outputs, dim=1, keepdim=True)
-            print("Size of predicted_classes:", predicted_classes.size())
-
-            loss = criterion(predicted_classes, labels)
+            loss = criterion(outputs, labels)
             running_loss += loss.item()
 
         validation_loss = running_loss / len(val_loader)
