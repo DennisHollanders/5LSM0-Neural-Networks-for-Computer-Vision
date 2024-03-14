@@ -4,11 +4,12 @@ from torch.utils.data import DataLoader
 from helper import *
 from model import Model
 
+model_path = 'model_5530539.pth'
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load your trained model
-    model_path = 'model_and_training_state.pth'
+
     model = Model()  # Replace with your actual model class
     model.load_state_dict(torch.load(model_path, map_location=device)["model_state_dict"])
     model.to(device)

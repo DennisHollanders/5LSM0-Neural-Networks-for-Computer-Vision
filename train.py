@@ -16,6 +16,7 @@ import collections
 from model import Model
 import wandb
 from torch.utils.data import random_split
+from torchmetrics.classification import MulticlassJaccardIndex
 
 def get_arg_parser():
     parser = ArgumentParser()
@@ -27,7 +28,7 @@ def get_arg_parser():
         default_data_path = "City_Scapes/"
         default_batch_size = 4
         default_num_epochs = 1
-        default_resize = (64,64)
+        default_resize = (32,32)
 
     else:
         default_data_path = "/gpfs/work5/0/jhstue005/JHS_data/CityScapes"
@@ -43,14 +44,17 @@ def get_arg_parser():
     return parser
 
 def main(args):
-    Learning_rate = 0.02
-    val_size = 0.2
+    LEARNING_RATE = 0.02
+    VAL_SIZE = 0.2
+    NUM_CLASSES = 34
+
+
     wandb.init(
         # set the wandb project where this run will be logged
         project="5LSM0",
         # track hyperparameters and run metadata
         config={
-            "learning_rate": Learning_rate,
+            "learning_rate": LEARNING_RATE,
             "architecture": "Initial architecture",
             "dataset": "CityScapes",
             "epochs": args.num_epochs,
@@ -68,13 +72,13 @@ def main(args):
     # The Cityscapes dataset returns the target as PIL Image for 'semantic' target_type
     target_transform = transforms.Compose([
         transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
-        transforms.PILToTensor(),
+        OneHotEncode(num_classes=NUM_CLASSES),
     ])
 
     full_training_data = Cityscapes(root=args.data_path, split='train', mode='fine', target_type='semantic',
                                     transform=transform, target_transform=target_transform)
     total_size = len(full_training_data)
-    train_size = int(0.8 * total_size)
+    train_size = int(total_size * (1- VAL_SIZE))
     val_size = total_size - train_size
     training_data, validation_data = random_split(full_training_data, [train_size, val_size])
 
@@ -100,8 +104,9 @@ def main(args):
     model = Model()
     model.cuda() if torch.cuda.is_available() else model.cpu()
 
-    criterion = DiceLoss(eps=1.0, activation=None)
-    optimizer = optim.Adam(model.parameters(), lr=Learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
+    criterion = DiceLoss()
+    #criterion = MulticlassJaccardIndex(num_classes=34)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     num_epochs = args.num_epochs
 
     epoch_data = collections.defaultdict(list)
@@ -109,19 +114,28 @@ def main(args):
     for epoch in range(num_epochs):
         running_loss = 0.0
         for i, (inputs, labels) in enumerate(train_loader):
+
             if torch.cuda.is_available():
                 inputs = inputs.cuda()
                 labels = labels.cuda()
             else:
                 inputs = inputs.cpu()
                 labels = labels.cpu()
+
+
             optimizer.zero_grad()
             outputs = model(inputs)
+
+            #print(labels.size(), inputs.size(), outputs.size())
+            #print(len(torch.unique(labels)))
+            #predicted_classes = torch.argmax(outputs, dim=1, keepdim=True)
+            #print("Size of predicted_classes:", predicted_classes.size())
+            #labels_one_hot = one_hot_encoding(labels, NUM_CLASSES)
+
             loss = criterion(outputs,labels)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-            print('train iteration:', i)
 
         print('Epoch:',epoch)
         epoch_loss = running_loss/len(train_loader)
@@ -137,7 +151,13 @@ def main(args):
                 inputs = inputs.cpu()
                 labels = labels.cpu()
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+
+            print(labels.size(), inputs.size(), outputs.size())
+            print(len(torch.unique(labels)))
+            predicted_classes = torch.argmax(outputs, dim=1, keepdim=True)
+            print("Size of predicted_classes:", predicted_classes.size())
+
+            loss = criterion(predicted_classes, labels)
             running_loss += loss.item()
 
         validation_loss = running_loss / len(val_loader)
