@@ -88,7 +88,7 @@ def main(args):
     model = Model()
     model.cuda() if torch.cuda.is_available() else model.cpu()
     initialize_weights(model)
-    criterion = DiceLoss()
+    criterion = JaccardLoss()
     #criterion = MulticlassJaccardIndex(num_classes=34)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
     num_epochs = args.num_epochs
@@ -105,7 +105,7 @@ def main(args):
             else:
                 inputs = inputs.cpu()
                 labels = labels.cpu()
-
+            print('iteration:',i)
 
             optimizer.zero_grad()
             outputs = model(inputs)

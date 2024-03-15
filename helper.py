@@ -26,9 +26,6 @@ class DiceLoss(nn.Module):
         super(DiceLoss, self).__init__()
 
     def forward(self, inputs, targets, smooth=1):
-        # comment out if your model contains a sigmoid or equivalent activation layer
-
-
         # flatten label and prediction tensors
         inputs = inputs.view(-1)
         targets = targets.view(-1)
@@ -37,56 +34,31 @@ class DiceLoss(nn.Module):
         dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
 
         return 1 - dice
-"""
-def f_score(pr, gt, beta=1, eps=1e-7, threshold=None, activation='sigmoid'):
-    
-    Args:
-        pr (torch.Tensor): A list of predicted elements
-        gt (torch.Tensor):  A list of elements that are to be predicted
-        eps (float): epsilon to avoid zero division
-        threshold: threshold for outputs binarization
-    Returns:
-        float: IoU (Jaccard) score
-    
-
-    if activation is None or activation == "none":
-        activation_fn = lambda x: x
-    elif activation == "sigmoid":
-        activation_fn = torch.nn.Sigmoid()
-    elif activation == "softmax2d":
-        activation_fn = torch.nn.Softmax2d()
-    else:
-        raise NotImplementedError(
-            "Activation implemented for sigmoid and softmax2d"
-        )
-
-    pr = activation_fn(pr)
-
-    if threshold is not None:
-        pr = (pr > threshold).float()
 
 
-    tp = torch.sum(gt * pr)
-    fp = torch.sum(pr) - tp
-    fn = torch.sum(gt) - tp
+class JaccardLoss(nn.Module):
+    def __init__(self, weight=None, size_average=True):
+        super(JaccardLoss, self).__init__()
 
-    score = ((1 + beta ** 2) * tp + eps) \
-            / ((1 + beta ** 2) * tp + beta ** 2 * fn + fp + eps)
+    def forward(self, inputs, targets, smooth=1):
+        # Flatten label and prediction tensors
+        inputs = inputs.view(-1)
+        targets = targets.view(-1)
 
-    return score
-class DiceLoss(nn.Module):
-    __name__ = 'dice_loss'
-    #from: https://www.kaggle.com/code/dhananjay3/image-segmentation-from-scratch-in-pytorch
-    def __init__(self, eps=1e-7, activation='sigmoid'):
-        super().__init__()
-        self.activation = activation
-        self.eps = eps
+        # Intersection is the sum of the element-wise product
+        intersection = (inputs * targets).sum()
 
-    def forward(self, y_pr, y_gt):
-        return 1 - f_score(y_pr, y_gt, beta=1.,
-                           eps=self.eps, threshold=None,
-                           activation=self.activation)
-"""
+        # The size of the union is the sum of all predictions plus
+        # the sum of all targets minus the size of the intersection
+        total = inputs.sum() + targets.sum()
+        union = total - intersection
+
+        # Jaccard index
+        jaccard = (intersection + smooth) / (union + smooth)
+
+        # Jaccard loss
+        return 1 - jaccard
+
 def print_gradients(model):
     for name, parameter in model.named_parameters():
         if parameter.grad is not None:

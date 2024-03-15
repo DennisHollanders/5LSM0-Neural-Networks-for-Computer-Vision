@@ -48,12 +48,6 @@ class Model(nn.Module):
         outputs = self.outputs(d4)
         outputs = nn.functional.softmax(outputs, dim =1 )
 
-        # Apply softmax to compute probabilities across the channel dimension
-        #outputs = torch.softmax(outputs, dim=1)
-
-        # Select the index (class label) of the highest probability for each pixel
-        #outputs = torch.argmax(outputs, dim=1, keepdim=True)
-
         return outputs
 
 class conv_block(nn.Module):
