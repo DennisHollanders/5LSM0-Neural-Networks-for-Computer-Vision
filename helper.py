@@ -77,3 +77,40 @@ def initialize_weights(model):
             nn.init.constant_(module.weight, 1)
             nn.init.constant_(module.bias, 0)
 
+
+def apply_canny_edge_detection(image_tensor, low_threshold=50, high_threshold=150):
+    """
+    Apply Canny edge detection to a PyTorch tensor (image).
+    Assumes the input tensor is in CxHxW format and normalized [0, 1].
+
+    Args:
+    - image_tensor (torch.Tensor): The input image tensor.
+    - low_threshold (int): Low threshold for Canny.
+    - high_threshold (int): High threshold for Canny.
+
+    Returns:
+    - torch.Tensor: The edge-detected image as a tensor.
+    """
+    # Convert the tensor to a numpy array and scale to [0, 255]
+    image_np = image_tensor.numpy().transpose(1, 2, 0) * 255
+    image_np = image_np.astype(np.uint8)
+
+    # Convert to grayscale if it's not already
+    if image_np.shape[2] == 3:
+        image_gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
+    else:
+        image_gray = image_np
+
+    # Apply Canny edge detection
+    edges = cv2.Canny(image_gray, low_threshold, high_threshold)
+
+    # Convert back to tensor
+    edges_tensor = torch.from_numpy(edges).to(torch.float32) / 255.0
+    edges_tensor = edges_tensor.unsqueeze(0)  # Add a channel dimension
+
+    return edges_tensor
+
+def canny_edge_transform(image):
+    image_tensor = transforms.ToTensor()(image)
+    edge_tensor = apply_canny_edge_detection(image_tensor)
+    return torch.cat((image_tensor, edge_tensor), dim=0)

@@ -16,6 +16,7 @@ import collections
 from model import Model
 import wandb
 from torch.utils.data import random_split
+from torchvision.transforms import Lambda
 from torchmetrics.classification import MulticlassJaccardIndex
 
 def get_arg_parser():
@@ -65,7 +66,8 @@ def main(args):
     """define your model, trainingsloop optimitzer etc. here"""
     transform = transforms.Compose([
         transforms.Resize(args.resize),
-        transforms.ToTensor(),
+        #transforms.ToTensor(),
+        Lambda(canny_edge_transform)
     ])
 
     # The Cityscapes dataset returns the target as PIL Image for 'semantic' target_type

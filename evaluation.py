@@ -22,9 +22,6 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = Model()
-    #model.load_state_dict(torch.load(model_path, map_location=device)["model_state_dict"])
-    #model.to(device)
-
     state = torch.load(model_path, map_location=device)
     model.load_state_dict(state["model_state_dict"])
     model.to(device)
