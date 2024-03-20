@@ -51,9 +51,10 @@ class WeightedJaccardLoss(nn.Module):
 
         # Weighted Jaccard index
         jaccard = (intersection + smooth) / (union + smooth)
-
+        categorical_loss = -torch.sum(targets_flat_weight * torch.log(inputs_flat_weight + 1e-6), dim=1).mean()
+        jaccard_loss = 1-jaccard
         # Weighted Jaccard loss
-        return 1 - jaccard
+        return (categorical_loss + jaccard_loss) / 2
 
 
         """
