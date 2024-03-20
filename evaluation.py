@@ -3,13 +3,14 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 from helper import *
 from model import Model
+from torchvision.transforms import Lambda
 
-model_path = 'models/base_model_5541439.pth'
+model_path = 'models/base_model_Jaccard_5567561.pth'
 
 def plot_losses(epoch_data):
     train_losses = epoch_data['loss']
     val_losses = epoch_data['validation_loss']
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(15, 5))
     plt.plot(train_losses, label='Training Loss')
     plt.plot(val_losses, label='Validation Loss')
     plt.xlabel('Epochs')
@@ -28,15 +29,17 @@ def main():
 
     # Extract and plot the training and validation losses
     epoch_data = state['epoch_data']
-    plot_losses(epoch_data)
+    #plot_losses(epoch_data)
 
     # Prepare the dataset and DataLoader
     transform = transforms.Compose([
         transforms.Resize((256, 512)),
+        #Lambda(canny_edge_transform),
         transforms.ToTensor(),
     ])
     target_transform = transforms.Compose([
         transforms.Resize((256, 512), interpolation=transforms.InterpolationMode.NEAREST),
+        #Lambda(canny_edge_segment)
         transforms.PILToTensor(),
     ])
     dataset = Cityscapes(root='City_Scapes/', split='val', mode='fine', target_type='semantic',
@@ -60,9 +63,13 @@ def visualize_predictions(loader, model, num_images, device):
             img = img.to(device)
             outputs = model(img)
             _, preds = torch.max(outputs, 1)
-
+            #print(img.size() )
+            #img = img[:,3:]
+            #print(img.size())
+            print(true_segmentation.size(),true_segmentation)
             # Convert to numpy for visualization
             img_np = img.cpu().squeeze().numpy()
+            true_segmentation = true_segmentation[:,0]
             true_segmentation_np = true_segmentation.cpu().squeeze().numpy()
             preds_np = preds.cpu().squeeze().numpy()
 

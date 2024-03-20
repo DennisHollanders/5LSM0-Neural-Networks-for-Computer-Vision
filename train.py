@@ -2,9 +2,7 @@
 This file needs to contain the main training loop. The training code should be encapsulated in a main() function to
 avoid any global variables.
 """
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+
 import torch.optim as optim
 from torchvision.datasets import Cityscapes
 from torchvision import transforms
@@ -17,7 +15,6 @@ from model import Model
 import wandb
 from torch.utils.data import random_split
 from torchvision.transforms import Lambda
-from torchmetrics.classification import MulticlassJaccardIndex
 
 def get_arg_parser():
     parser = ArgumentParser()
@@ -48,7 +45,6 @@ def main(args):
     VAL_SIZE = 0.2
     NUM_CLASSES = 34
 
-
     wandb.init(
         # set the wandb project where this run will be logged
         project="5LSM0",
@@ -66,14 +62,21 @@ def main(args):
     """define your model, trainingsloop optimitzer etc. here"""
     transform = transforms.Compose([
         transforms.Resize(args.resize),
-        #transforms.ToTensor(),
-        Lambda(canny_edge_transform)
+        transforms.ToTensor(),
     ])
 
     # The Cityscapes dataset returns the target as PIL Image for 'semantic' target_type
+    """
     target_transform = transforms.Compose([
         transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
+       
+    ])
+    """
+    target_transform = transforms.Compose([
+        transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
+        Lambda(edge_and_distance_transform),
         OneHotEncode(num_classes=NUM_CLASSES),
+        #transforms.ToTensor(),
     ])
 
     full_training_data = Cityscapes(root=args.data_path, split='train', mode='fine', target_type='semantic',
@@ -84,14 +87,14 @@ def main(args):
     training_data, validation_data = random_split(full_training_data, [train_size, val_size])
 
     # Create DataLoaders for training and validation sets
-    train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, num_workers=8)
-    val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, num_workers=8)
+    train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, num_workers=1)
+    val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, num_workers=1)
 
     model = Model()
     model.cuda() if torch.cuda.is_available() else model.cpu()
     initialize_weights(model)
-    criterion = JaccardLoss()
-    #criterion = MulticlassJaccardIndex(num_classes=34)
+    criterion = WeightedJaccardLoss(num_classes = NUM_CLASSES)
+    #criterion = CombinedLoss(num_classes=NUM_CLASSES)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
     num_epochs = args.num_epochs
 
@@ -100,6 +103,10 @@ def main(args):
     for epoch in range(num_epochs):
         running_loss = 0.0
         for i, (inputs, labels) in enumerate(train_loader):
+            print('-------------- \n start train_loader iteration \n --------------')
+            print(inputs.size(),labels.size())
+            #img = Image.fromarray(labels[0,0,:,:])
+            #img.show()
 
             if torch.cuda.is_available():
                 inputs = inputs.cuda()
@@ -170,3 +177,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args,parser)
     main(args)
+
+
