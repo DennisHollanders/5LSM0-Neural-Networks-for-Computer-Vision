@@ -96,7 +96,7 @@ def main(args):
     val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, num_workers=8)
 
     model = Model()
-    model.cuda() if torch.cuda.is_available() else model.cpu()
+
     initialize_weights(model)
     criterion = DiceLoss(NUM_CLASSES)
     #criterion = WeightedJaccardLoss(num_classes = NUM_CLASSES)
@@ -105,6 +105,7 @@ def main(args):
     num_epochs = args.num_epochs
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)  # .cuda() if torch.cuda.is_available() else model.cpu()
 
     epoch_data = collections.defaultdict(list)
     # training/validation loop
