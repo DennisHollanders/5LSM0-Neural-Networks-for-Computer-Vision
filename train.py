@@ -116,7 +116,6 @@ def main(args):
             #img = Image.fromarray(labels[0,0,:,:])
             #img.show()
             labels = (labels * 255).long().squeeze()  #
-
             labels = utils.map_id_to_train_id(labels).to(device)
             inputs.to(device)
             optimizer.zero_grad()
@@ -141,6 +140,7 @@ def main(args):
         model.eval()
         running_loss = 0.0
         for inputs,labels in val_loader:
+            labels = (labels * 255).long().squeeze()
             labels = utils.map_id_to_train_id(labels).to(device)
             inputs.to(device)
             outputs = model(inputs)
