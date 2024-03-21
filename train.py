@@ -96,16 +96,17 @@ def main(args):
     val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, num_workers=8)
 
     model = Model()
-
     initialize_weights(model)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+
     criterion = DiceLoss(NUM_CLASSES)
     #criterion = WeightedJaccardLoss(num_classes = NUM_CLASSES)
     #criterion = CombinedLoss(num_classes=NUM_CLASSES)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
     num_epochs = args.num_epochs
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)  # .cuda() if torch.cuda.is_available() else model.cpu()
+
 
     epoch_data = collections.defaultdict(list)
     # training/validation loop
@@ -116,9 +117,11 @@ def main(args):
             #print(inputs.size(),labels.size())
             #img = Image.fromarray(labels[0,0,:,:])
             #img.show()
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             labels = (labels * 255).long().squeeze()  #
             labels = utils.map_id_to_train_id(labels).to(device)
-            inputs.to(device)
+            inputs = inputs.to(device)
+
             optimizer.zero_grad()
             outputs = model(inputs)
 
@@ -143,7 +146,7 @@ def main(args):
         for inputs,labels in val_loader:
             labels = (labels * 255).long().squeeze()
             labels = utils.map_id_to_train_id(labels).to(device)
-            inputs.to(device)
+            inputs = inputs.to(device)
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             running_loss += loss.item()
