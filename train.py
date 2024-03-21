@@ -16,7 +16,10 @@ import wandb
 from torch.utils.data import random_split
 from torchvision.transforms import Lambda
 import utils
-import pretty_errors
+try:
+    import pretty_errors
+except ImportError:
+    pass
 
 def get_arg_parser():
     parser = ArgumentParser()

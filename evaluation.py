@@ -5,7 +5,10 @@ from helper import *
 from model import Model
 from torchvision.transforms import Lambda
 import utils
-import pretty_errors
+try:
+    import pretty_errors
+except ImportError:
+    pass
 
 model_path = 'models/model_5627958.pth'
 
