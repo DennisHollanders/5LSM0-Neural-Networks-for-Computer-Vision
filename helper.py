@@ -22,21 +22,21 @@ class WeightedJaccardLoss(nn.Module):
         # Assuming targets are in the format [N, C, H, W] where C=3 with the first channel for segmentation
         # and the third for the distance transform map
 
-        print('-------------- \n Started losses \n ---------------')
-        print(targets.shape)
-        print('num_classes', self.num_classes)
+        #print('-------------- \n Started losses \n ---------------')
+        #print(targets.shape)
+        #print('num_classes', self.num_classes)
         segmentation_targets = targets[:,:self.num_classes, :, :]
         distance_transform_weights = targets[:, -1, :, :].unsqueeze(1)
-        print('segmentation, distance map, inputs:',segmentation_targets.shape,distance_transform_weights.shape, inputs.shape)
+        #print('segmentation, distance map, inputs:',segmentation_targets.shape,distance_transform_weights.shape, inputs.shape)
         segmentation = segmentation_targets * distance_transform_weights
-        print('segmentation shape',segmentation.shape)
+        #print('segmentation shape',segmentation.shape)
 
         # Flatten label, prediction, and weight tensors
         inputs_flat_weight = (inputs * distance_transform_weights).reshape(-1)
         targets_flat_weight = (segmentation_targets * distance_transform_weights).reshape(-1)
         #weights_flattened = distance_transform_weights.reshape(-1)
 
-        print('input,targets,weights', inputs_flat_weight.shape,targets_flat_weight.shape,)
+        #print('input,targets,weights', inputs_flat_weight.shape,targets_flat_weight.shape,)
 
         # Intersection is the sum of the element-wise product of inputs and targets, modulated by weights
         intersection = (inputs_flat_weight * targets_flat_weight).sum()
@@ -51,10 +51,10 @@ class WeightedJaccardLoss(nn.Module):
 
         # Weighted Jaccard index
         jaccard = (intersection + smooth) / (union + smooth)
-        categorical_loss = -torch.sum(targets_flat_weight * torch.log(inputs_flat_weight + 1e-6), dim=1).mean()
+        categorical_loss = -torch.sum(targets_flat_weight * torch.log(inputs_flat_weight + 1e-6), dim=0).mean()
         jaccard_loss = 1-jaccard
         # Weighted Jaccard loss
-        return (categorical_loss + jaccard_loss) / 2
+        return categorical_loss # (categorical_loss + jaccard_loss) / 2
 
 
         """

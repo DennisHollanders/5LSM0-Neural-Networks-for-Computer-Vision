@@ -5,7 +5,7 @@ from helper import *
 from model import Model
 from torchvision.transforms import Lambda
 
-model_path = 'models/base_model_Jaccard_5567561.pth'
+model_path = 'models/model_5625789.pth'
 
 def plot_losses(epoch_data):
     train_losses = epoch_data['loss']
@@ -39,8 +39,9 @@ def main():
     ])
     target_transform = transforms.Compose([
         transforms.Resize((256, 512), interpolation=transforms.InterpolationMode.NEAREST),
-        #Lambda(canny_edge_segment)
-        transforms.PILToTensor(),
+        Lambda(edge_and_distance_transform),
+        OneHotEncode(num_classes=34),
+        # transforms.ToTensor(),
     ])
     dataset = Cityscapes(root='City_Scapes/', split='val', mode='fine', target_type='semantic',
                          transform=transform, target_transform=target_transform)

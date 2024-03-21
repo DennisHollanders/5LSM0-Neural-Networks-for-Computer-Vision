@@ -103,8 +103,8 @@ def main(args):
     for epoch in range(num_epochs):
         running_loss = 0.0
         for i, (inputs, labels) in enumerate(train_loader):
-            print('-------------- \n start train_loader iteration \n --------------')
-            print(inputs.size(),labels.size())
+            #print('-------------- \n start train_loader iteration \n --------------')
+            #print(inputs.size(),labels.size())
             #img = Image.fromarray(labels[0,0,:,:])
             #img.show()
 
@@ -114,7 +114,7 @@ def main(args):
             else:
                 inputs = inputs.cpu()
                 labels = labels.cpu()
-            print('iteration:',i)
+            #print('iteration:',i)
 
             optimizer.zero_grad()
             outputs = model(inputs)
