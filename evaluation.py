@@ -4,8 +4,10 @@ from torch.utils.data import DataLoader
 from helper import *
 from model import Model
 from torchvision.transforms import Lambda
+import utils
+import pretty_errors
 
-model_path = 'models/model_5625789.pth'
+model_path = 'models/model_5627958.pth'
 
 def plot_losses(epoch_data):
     train_losses = epoch_data['loss']
@@ -57,25 +59,26 @@ def visualize_predictions(loader, model, num_images, device):
 
     model.eval()
     with torch.no_grad():
-        for i, (img, true_segmentation) in enumerate(loader):
+        for i, (inputs, labels) in enumerate(loader):
             if i >= num_images:
                 break
-
-            img = img.to(device)
-            outputs = model(img)
+            labels = (labels * 255).long().squeeze()  #
+            labels = utils.map_id_to_train_id(labels).to(device)
+            inputs.to(device)
+            outputs = model(inputs)
             _, preds = torch.max(outputs, 1)
             #print(img.size() )
             #img = img[:,3:]
             #print(img.size())
-            print(true_segmentation.size(),true_segmentation)
+            print(labels.size(),labels)
             # Convert to numpy for visualization
-            img_np = img.cpu().squeeze().numpy()
-            true_segmentation = true_segmentation[:,0]
-            true_segmentation_np = true_segmentation.cpu().squeeze().numpy()
+            img_np = inputs.cpu().squeeze().numpy()
+            labels = labels[:,0]
+            labels_np = labels.cpu().squeeze().numpy()
             preds_np = preds.cpu().squeeze().numpy()
 
             img_np = np.transpose(img_np, (1, 2, 0))
-            true_color_segmentation = true_segmentation_np
+            true_color_segmentation = labels_np
             preds_color_segmentation = preds_np
 
             # Original Image

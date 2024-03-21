@@ -56,47 +56,32 @@ class WeightedJaccardLoss(nn.Module):
         # Weighted Jaccard loss
         return categorical_loss # (categorical_loss + jaccard_loss) / 2
 
-
+    def categorical_cross_entropy_loss(predictions, labels, epsilon=1e-10):
         """
-        #class_weights =
-        #distance_transform =
-        # Element-wise multiplication for intersection, considering class and distance weights
-        intersection = inputs * targets * class_weights.view(1, -1, 1, 1) * distance_transform
-        intersection = intersection.sum(dim=(2, 3))  # Summing over height and width
+        Calculates the categorical cross entropy loss.
 
-        # Calculating union
-        union = inputs + targets - intersection
+        Parameters:
+        - predictions: Tensor of shape [B, C, W, H]. Predicted probabilities for each class.
+        - labels: Tensor of shape [B, W, H]. Ground truth labels.
+        - epsilon: Small value to avoid log(0).
 
-        # Applying weights to union similarly
-        union = union * class_weights.view(1, -1, 1, 1) * distance_transform
-        union = union.sum(dim=(2, 3))  # Summing over height and width
+        Returns:
+        - loss: Scalar tensor. The average loss across all pixels and batch.
+        """
+        # Convert labels to one-hot encoding
+        B, C, W, H = predictions.shape
+        labels_one_hot = F.one_hot(labels, num_classes=C).permute(0, 3, 1, 2).float()
 
-        # Final IoU score and loss
-        iou_score = intersection.sum(dim=1) / union.sum(dim=1)  # Summing over classes
-        loss = 1 - iou_score.mean()  # Averaging over the batch
+        # Apply epsilon to predictions to avoid log(0)
+        predictions = torch.clamp(predictions, epsilon, 1. - epsilon)
+
+        # Calculate pixel-wise loss
+        pixel_wise_loss = -torch.sum(labels_one_hot * torch.log(predictions), dim=1)
+
+        # Calculate the average loss
+        loss = torch.mean(pixel_wise_loss)
 
         return loss
-        
-        """
-
-
-class CombinedLoss(nn.Module):
-    def __init__(self, num_classes,):
-        super(CombinedLoss, self).__init__()
-
-    def forward(self, inputs_softmax,targets,weights):
-        targets_one_hot = distance_transform_weights = targets[:, -1, :, :].unsqueeze(1)
-        categorical_loss = -torch.sum(targets_one_hot * torch.log(inputs_softmax + 1e-6), dim=1).mean()
-        jaccard_loss = self.jaccard_loss(inputs_softmax, targets_one_hot)
-
-        combined_loss = weights[0]* categorical_loss + weights[1]*jaccard_loss
-        return combined_loss
-
-    def jaccard_loss(self, predicted, target):
-        intersection = (predicted * target).sum(dim=(2, 3))
-        union = predicted.sum(dim=(2, 3)) + target.sum(dim=(2, 3)) - intersection
-        jaccard_score = (intersection + 1e-6) / (union + 1e-6)
-        return 1 - jaccard_score.mean()
 
 
 class OneHotEncode(torch.nn.Module):
@@ -131,36 +116,19 @@ class OneHotEncode(torch.nn.Module):
             return final_output
         else:
             return print('Error incorrect shape inserted in OneHot')
-"""
-class OneHotEncode(torch.nn.Module):
-    def __init__(self, num_classes):
-        super(OneHotEncode, self).__init__()
-        self.num_classes = num_classes
-
-    def forward(self, label):
-        # Assuming label is a PIL Image with mode 'L' and needs to be converted to a tensor
-        target = label[:,]
-        target = transforms.PILToTensor()(target)
-        target = label.squeeze(0).to(torch.int64)
-        one_hot = torch.zeros(self.num_classes, target.size(0), target.size(1), dtype=torch.float32, device=target.device)
-        one_hot = one_hot.scatter_(0, target.unsqueeze(0), 1)
-        if target.shape[0] > 1:
-            additional_channels = target[1:, :, :]
-            target = torch.cat([one_hot, additional_channels], dim=0)
-        else:
-            target = one_hot
-
-        return Image.fromarray(target)
-"""
 
 class DiceLoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
+    def __init__(self, num_classes, weight=None, size_average=True):
         super(DiceLoss, self).__init__()
+        self.num_classes = num_classes
 
     def forward(self, inputs, targets, smooth=1):
+
+        targets = targets[:, :self.num_classes, :, :]
+
         # flatten label and prediction tensors
-        inputs = inputs.view(-1)
-        targets = targets.view(-1)
+        inputs = inputs.reshape(-1)
+        targets = targets.reshape(-1)
 
         intersection = (inputs * targets).sum()
         dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)

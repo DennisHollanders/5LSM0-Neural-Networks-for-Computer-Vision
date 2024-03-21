@@ -15,6 +15,8 @@ from model import Model
 import wandb
 from torch.utils.data import random_split
 from torchvision.transforms import Lambda
+import utils
+import pretty_errors
 
 def get_arg_parser():
     parser = ArgumentParser()
@@ -87,16 +89,19 @@ def main(args):
     training_data, validation_data = random_split(full_training_data, [train_size, val_size])
 
     # Create DataLoaders for training and validation sets
-    train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, num_workers=1)
-    val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, num_workers=1)
+    train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, num_workers=8)
+    val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, num_workers=8)
 
     model = Model()
     model.cuda() if torch.cuda.is_available() else model.cpu()
     initialize_weights(model)
-    criterion = WeightedJaccardLoss(num_classes = NUM_CLASSES)
+    criterion = DiceLoss(NUM_CLASSES)
+    #criterion = WeightedJaccardLoss(num_classes = NUM_CLASSES)
     #criterion = CombinedLoss(num_classes=NUM_CLASSES)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
     num_epochs = args.num_epochs
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     epoch_data = collections.defaultdict(list)
     # training/validation loop
@@ -107,15 +112,10 @@ def main(args):
             #print(inputs.size(),labels.size())
             #img = Image.fromarray(labels[0,0,:,:])
             #img.show()
+            labels = (labels * 255).long().squeeze()  #
 
-            if torch.cuda.is_available():
-                inputs = inputs.cuda()
-                labels = labels.cuda()
-            else:
-                inputs = inputs.cpu()
-                labels = labels.cpu()
-            #print('iteration:',i)
-
+            labels = utils.map_id_to_train_id(labels).to(device)
+            inputs.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
 
@@ -138,12 +138,8 @@ def main(args):
         model.eval()
         running_loss = 0.0
         for inputs,labels in val_loader:
-            if torch.cuda.is_available():
-                inputs = inputs.cuda()
-                labels = labels.cuda()
-            else:
-                inputs = inputs.cpu()
-                labels = labels.cpu()
+            labels = utils.map_id_to_train_id(labels).to(device)
+            inputs.to(device)
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             running_loss += loss.item()
