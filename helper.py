@@ -7,20 +7,42 @@ from torchvision.transforms import transforms
 from torchvision.transforms import functional as F
 #from scipy.ndimage import
 from PIL import Image
+
+class DiceLoss(nn.Module):
+    def __init__(self, num_classes, weight=None, size_average=True):
+        super(DiceLoss, self).__init__()
+        self.num_classes = num_classes
+        self.smooth = 1
+
+    def forward(self, inputs, targets):
+        #print('inputs shape:', inputs.shape)
+        #print('target shape:', targets.shape)
+        targets = targets[:, :self.num_classes, :, :]
+        #print('target shape:', targets.shape)
+        # flatten label and prediction tensors
+        #print(targets[0,:,:5,:5])
+        #print(inputs[0,:,:5,:5])
+
+        loss = 0.0
+        for class_idx in range(self.num_classes):
+            input_flat = inputs[:, class_idx, :, :].reshape(-1)
+            target_flat = targets[:, class_idx, :, :].reshape(-1)
+
+            intersection = (input_flat * target_flat).sum()
+            dice_score = (2. * intersection + self.smooth) / (input_flat.sum() + target_flat.sum() + self.smooth)
+            loss += (1 - dice_score)
+
+        # Average the loss across all classes
+        print(loss)
+        return loss / self.num_classes
+
+
 class WeightedJaccardLoss(nn.Module):
     def __init__(self, num_classes):
         super(WeightedJaccardLoss, self).__init__()
         self.num_classes = num_classes
 
     def forward(self, inputs, targets, smooth=1):
-        """
-        inputs: predicted probabilities for each class, shape (N, H, W) assuming N is batch size
-        targets: ground truth, with the first channel for semantic segmentation and
-                 the third channel for the distance transform map, shape (N, C, H, W)
-        smooth: smoothing constant to avoid division by zero
-        """
-        # Assuming targets are in the format [N, C, H, W] where C=3 with the first channel for segmentation
-        # and the third for the distance transform map
 
         #print('-------------- \n Started losses \n ---------------')
         #print(targets.shape)
@@ -56,27 +78,13 @@ class WeightedJaccardLoss(nn.Module):
         # Weighted Jaccard loss
         return categorical_loss # (categorical_loss + jaccard_loss) / 2
 
-    def categorical_cross_entropy_loss(predictions, labels, epsilon=1e-10):
-        """
-        Calculates the categorical cross entropy loss.
-
-        Parameters:
-        - predictions: Tensor of shape [B, C, W, H]. Predicted probabilities for each class.
-        - labels: Tensor of shape [B, W, H]. Ground truth labels.
-        - epsilon: Small value to avoid log(0).
-
-        Returns:
-        - loss: Scalar tensor. The average loss across all pixels and batch.
-        """
-        # Convert labels to one-hot encoding
-        B, C, W, H = predictions.shape
-        labels_one_hot = F.one_hot(labels, num_classes=C).permute(0, 3, 1, 2).float()
+    def categorical_cross_entropy_loss(self, predictions, labels, epsilon=1e-10):
 
         # Apply epsilon to predictions to avoid log(0)
         predictions = torch.clamp(predictions, epsilon, 1. - epsilon)
 
         # Calculate pixel-wise loss
-        pixel_wise_loss = -torch.sum(labels_one_hot * torch.log(predictions), dim=1)
+        pixel_wise_loss = -torch.sum(labels * torch.log(predictions), dim=1)
 
         # Calculate the average loss
         loss = torch.mean(pixel_wise_loss)
@@ -112,28 +120,8 @@ class OneHotEncode(torch.nn.Module):
 
             #print('Final output shape:', final_output.shape)
             return final_output
-
-            return final_output
         else:
             return print('Error incorrect shape inserted in OneHot')
-
-class DiceLoss(nn.Module):
-    def __init__(self, num_classes, weight=None, size_average=True):
-        super(DiceLoss, self).__init__()
-        self.num_classes = num_classes
-
-    def forward(self, inputs, targets, smooth=1):
-
-        targets = targets[:, :self.num_classes, :, :]
-
-        # flatten label and prediction tensors
-        inputs = inputs.reshape(-1)
-        targets = targets.reshape(-1)
-
-        intersection = (inputs * targets).sum()
-        dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
-
-        return 1 - dice
 
 
 class JaccardLoss(nn.Module):
@@ -141,9 +129,11 @@ class JaccardLoss(nn.Module):
         super(JaccardLoss, self).__init__()
 
     def forward(self, inputs, targets, smooth=1):
-        # Flatten label and prediction tensors
-        inputs = inputs.view(-1)
-        targets = targets.view(-1)
+        targets = targets[:, :self.num_classes, :, :]
+
+        # flatten label and prediction tensors
+        inputs = inputs.reshape(-1)
+        targets = targets.reshape(-1)
 
         # Intersection is the sum of the element-wise product
         intersection = (inputs * targets).sum()
@@ -170,9 +160,9 @@ def print_gradients(model):
 def initialize_weights(model):
     for module in model.modules():
         if isinstance(module, (nn.Conv2d, nn.Linear)):
-            nn.init.xavier_uniform_(module.weight)
+            nn.init.kaiming_uniform_(module.weight, mode='fan_in', nonlinearity='relu')
             if module.bias is not None:
-                nn.init.constant_(module.bias, 0)
+                nn.init.constant_(module.bias,0)
         elif isinstance(module, nn.BatchNorm2d):
             nn.init.constant_(module.weight, 1)
             nn.init.constant_(module.bias, 0)
@@ -197,28 +187,18 @@ def detect_edges(image):
 def edge_and_distance_transform(image, num_levels_below_30_percent=5):
     """Creates an image with 3 channels: original, detected edges, and the distance transform map."""
     original_image_array = np.array(image)
-
-    # Ensure the original image array is 2D (grayscale)
     if original_image_array.ndim != 2:
-        raise ValueError("The original image must be a single-channel (grayscale) image.")
-
+        raise ValueError("The original image must be a single channel image.")
     # Detect edges and calculate the distance transform
     edge_detected_image = detect_edges(image)
     edge_transform = np.array(edge_detected_image) * 255
     distance_transform_map = calculate_distance_transform(edge_transform, num_levels_below_30_percent)
-
     # Ensure all images are of the same dtype
     original_image_array = original_image_array.astype(np.uint8)
     edge_transform = edge_transform.astype(np.uint8)
     distance_transform_map = distance_transform_map.astype(np.uint8)
-
     # Combine into a 3-channel image
     combined_image_array = np.stack((original_image_array, edge_transform, distance_transform_map), axis=0)
-
-    # Convert back to PIL Image
-    #combined_image_pil = Image.fromarray(combined_image_array)
-
-    #print('combined image array shape',combined_image_array.shape)
     return combined_image_array
 
 
@@ -228,6 +208,12 @@ def calculate_distance_transform(edge_detected_image, num_levels_below_30_percen
 
     inverted_image = np.abs(edge_detected_image - 255)
     distance_transform = cv2.distanceTransform(inverted_image, cv2.DIST_L2, 5)
+    normalized_distance_transform = distance_transform / distance_transform.max()
+
+    # Invert the distances so closer pixels have higher values
+    inverted_distance_transform = 1 - normalized_distance_transform
+
+    distance_transform = (inverted_distance_transform * 255).astype(np.uint8)
     Quantization = False
     if Quantization:
         threshold_30_percent = 0.05 * max_distance
@@ -236,7 +222,6 @@ def calculate_distance_transform(edge_detected_image, num_levels_below_30_percen
         quantized_distance_transform = np.zeros_like(normalized_distance_transform)
 
         quantized_distance_transform[normalized_distance_transform > threshold_30_percent] = 255
-
         for level in range(1, num_levels_below_30_percent + 1):
             lower_bound = (level - 1) / num_levels_below_30_percent * threshold_30_percent
             upper_bound = level / num_levels_below_30_percent * threshold_30_percent

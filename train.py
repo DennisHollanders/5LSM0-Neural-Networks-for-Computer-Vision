@@ -67,16 +67,13 @@ def main(args):
     """define your model, trainingsloop optimitzer etc. here"""
     transform = transforms.Compose([
         transforms.Resize(args.resize),
+        #transforms.Grayscale(num_output_channels=1),
         transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
     # The Cityscapes dataset returns the target as PIL Image for 'semantic' target_type
-    """
-    target_transform = transforms.Compose([
-        transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
-       
-    ])
-    """
+
     target_transform = transforms.Compose([
         transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
         Lambda(edge_and_distance_transform),
@@ -91,6 +88,7 @@ def main(args):
     val_size = total_size - train_size
     training_data, validation_data = random_split(full_training_data, [train_size, val_size])
 
+
     # Create DataLoaders for training and validation sets
     train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, num_workers=8)
     val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, num_workers=8)
@@ -103,6 +101,7 @@ def main(args):
     criterion = DiceLoss(NUM_CLASSES)
     #criterion = WeightedJaccardLoss(num_classes = NUM_CLASSES)
     #criterion = CombinedLoss(num_classes=NUM_CLASSES)
+    #criterion  = nn.CrossEntropyLoss(ignore_index=255)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
     num_epochs = args.num_epochs
 
@@ -113,23 +112,12 @@ def main(args):
     for epoch in range(num_epochs):
         running_loss = 0.0
         for i, (inputs, labels) in enumerate(train_loader):
-            #print('-------------- \n start train_loader iteration \n --------------')
-            #print(inputs.size(),labels.size())
-            #img = Image.fromarray(labels[0,0,:,:])
-            #img.show()
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            labels = (labels * 255).long().squeeze()  #
-            labels = utils.map_id_to_train_id(labels).to(device)
-            inputs = inputs.to(device)
-
             optimizer.zero_grad()
+            #labels = (labels * 255).long().squeeze()  #
+            #labels = utils.map_id_to_train_id(labels).to(device)
+            labels = labels.to(device)
+            inputs = inputs.to(device)
             outputs = model(inputs)
-
-            #print(labels.size(), inputs.size(), outputs.size())
-            #print(len(torch.unique(labels)))
-            #predicted_classes = torch.argmax(outputs, dim=1, keepdim=True)
-            #print("Size of predicted_classes:", predicted_classes.size())
-            #labels_one_hot = one_hot_encoding(labels, NUM_CLASSES)
 
             loss = criterion(outputs,labels)
             loss.backward()
@@ -144,8 +132,9 @@ def main(args):
         model.eval()
         running_loss = 0.0
         for inputs,labels in val_loader:
-            labels = (labels * 255).long().squeeze()
-            labels = utils.map_id_to_train_id(labels).to(device)
+            #labels = (labels * 255).long().squeeze()
+            #labels = utils.map_id_to_train_id(labels).to(device)
+            labels = labels.to(device)
             inputs = inputs.to(device)
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -153,10 +142,8 @@ def main(args):
 
         validation_loss = running_loss / len(val_loader)
         epoch_data['validation_loss'].append(validation_loss)
-
         print(f"Epoch [{epoch + 1}/{num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
 
-    #torch.save(model.state_dict(), 'saved_model.pth')
     state = {
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
