@@ -98,7 +98,8 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    criterion = DiceLoss(NUM_CLASSES)
+    criterion = Loss_Functions(NUM_CLASSES,'Jaccard',False)
+
     #criterion = WeightedJaccardLoss(num_classes = NUM_CLASSES)
     #criterion = CombinedLoss(num_classes=NUM_CLASSES)
     #criterion  = nn.CrossEntropyLoss(ignore_index=255)

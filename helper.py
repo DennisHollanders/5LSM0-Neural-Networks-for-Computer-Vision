@@ -8,31 +8,36 @@ from torchvision.transforms import functional as F
 #from scipy.ndimage import
 from PIL import Image
 
-class DiceLoss(nn.Module):
-    def __init__(self, num_classes, weight=None, size_average=True):
-        super(DiceLoss, self).__init__()
+class Loss_Functions(nn.Module):
+    def __init__(self, num_classes,loss,Weight, weight=None, size_average=True):
+        super(Loss_Functions, self).__init__()
         self.num_classes = num_classes
+        self.loss = loss
         self.smooth = 1
+        self.weight = Weight
 
-    def forward(self, inputs, targets):
-        #print('inputs shape:', inputs.shape)
-        #print('target shape:', targets.shape)
+
+    def forward(self, predictions, targets):
         targets = targets[:, :self.num_classes, :, :]
-        #print('target shape:', targets.shape)
-        # flatten label and prediction tensors
-        #print(targets[0,:,:5,:5])
-        #print(inputs[0,:,:5,:5])
-
         loss = 0.0
+        if self.weight:
+            distance_transform_weight = targets[:,-1, :, :].reshape(-1)
+        else:
+            distance_transform_weight = np.ones_like(targets[:,-1, :, :]).reshape(-1)
         for class_idx in range(self.num_classes):
-            input_flat = inputs[:, class_idx, :, :].reshape(-1)
-            target_flat = targets[:, class_idx, :, :].reshape(-1)
+            input_flat = predictions[:, class_idx, :, :].reshape(-1)
+            target_flat = targets[:, class_idx, :, :].reshape(-1) *distance_transform_weight
 
             intersection = (input_flat * target_flat).sum()
-            dice_score = (2. * intersection + self.smooth) / (input_flat.sum() + target_flat.sum() + self.smooth)
-            loss += (1 - dice_score)
-
-        # Average the loss across all classes
+            if self.loss == 'Dice':
+                dice_score = (2. * intersection + self.smooth) / (input_flat.sum() + target_flat.sum() + self.smooth)
+                loss += (1 - dice_score)
+            elif self.loss == 'Jaccard':
+                total = input_flat.sum() + target_flat.sum()
+                union = total - intersection
+                # Jaccard index
+                jaccard = (intersection + self.smooth) / (union + self.smooth)
+                loss += 1 - jaccard
         print(loss)
         return loss / self.num_classes
 
