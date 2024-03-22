@@ -48,11 +48,11 @@ def get_arg_parser():
     parser.add_argument("--data_path", type=str, default=default_data_path, help="Path to the data")
     parser.add_argument("--batch_size", type=int, default=default_batch_size, help="Batch size for training")
     parser.add_argument("--num_epochs", type=int, default=default_num_epochs, help="Number of epochs for training")
-    parser.add_argument("--resize", type=int, default=default_resize, help="Image format that is being worked with ")
-    parser.add_argument("--loss", type=int, default= loss, help="Loss function applied to the model")
-    parser.add_argument("--distance_transform_weight", type=int, default=distance_transform_weight, help="Adds boundary information to loss function")
-    parser.add_argument("--learning_rate", type=int, default=learning_rate, help="Stepsize of the optimizer")
-    parser.add_argument("--val_size", type=int, default=val_size, help="Size of validation set, size trainset = 1- val_size")
+    parser.add_argument("--resize", type=tuple, default=default_resize, help="Image format that is being worked with ")
+    parser.add_argument("--loss", type=str, default= loss, help="Loss function applied to the model")
+    parser.add_argument("--distance_transform_weight", type=bool, default=distance_transform_weight, help="Adds boundary information to loss function")
+    parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Stepsize of the optimizer")
+    parser.add_argument("--val_size", type=float, default=val_size, help="Size of validation set, size trainset = 1- val_size")
     parser.add_argument("--num_classes", type=int, default=num_classes, help="Number of classes to be predicted")
     return parser
 
@@ -115,6 +115,10 @@ def main(args):
     for epoch in range(args.num_epochs):
         running_loss = 0.0
         for i, (inputs, labels) in enumerate(train_loader):
+            print('------------- \n inputs --------------')
+            print(inputs[0,:5,:5,:5])
+            print('------------- \n Labels --------------')
+            print(labels[0, :5, :5, :5])
             optimizer.zero_grad()
             #labels = (labels * 255).long().squeeze()  #
             #labels = utils.map_id_to_train_id(labels).to(device)

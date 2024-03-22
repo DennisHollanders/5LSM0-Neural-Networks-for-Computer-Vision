@@ -16,14 +16,13 @@ class Loss_Functions(nn.Module):
         self.smooth = 1
         self.weight = Weight
 
-
     def forward(self, predictions, targets):
         targets = targets[:, :self.num_classes, :, :]
         loss = 0.0
         if self.weight:
             distance_transform_weight = targets[:,-1, :, :].reshape(-1)
         else:
-            distance_transform_weight = np.ones_like(targets[:,-1, :, :]).reshape(-1)
+            distance_transform_weight = torch.ones_like(targets[:,-1, :, :]).reshape(-1)
         for class_idx in range(self.num_classes):
             input_flat = predictions[:, class_idx, :, :].reshape(-1)
             target_flat = targets[:, class_idx, :, :].reshape(-1) *distance_transform_weight

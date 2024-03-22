@@ -10,7 +10,7 @@ try:
 except ImportError:
     pass
 
-model_path = 'models/model_5627958.pth'
+model_path = 'models/model_5661125.pth'
 
 def plot_losses(epoch_data):
     train_losses = epoch_data['loss']
@@ -39,8 +39,9 @@ def main():
     # Prepare the dataset and DataLoader
     transform = transforms.Compose([
         transforms.Resize((256, 512)),
-        #Lambda(canny_edge_transform),
+        # transforms.Grayscale(num_output_channels=1),
         transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     target_transform = transforms.Compose([
         transforms.Resize((256, 512), interpolation=transforms.InterpolationMode.NEAREST),
@@ -65,9 +66,9 @@ def visualize_predictions(loader, model, num_images, device):
         for i, (inputs, labels) in enumerate(loader):
             if i >= num_images:
                 break
-            labels = (labels * 255).long().squeeze()  #
+            #labels = (labels).long().squeeze()  #
             labels = utils.map_id_to_train_id(labels).to(device)
-            inputs.to(device)
+            inputs = inputs.to(device)
             outputs = model(inputs)
             _, preds = torch.max(outputs, 1)
             #print(img.size() )
