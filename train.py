@@ -24,6 +24,12 @@ except ImportError:
 def get_arg_parser():
     parser = ArgumentParser()
 
+    loss = 'Jaccard'
+    distance_transform_weight = True
+    learning_rate = 5e-5
+    val_size = 0.2
+    num_classes = 34
+
     # Detect the running environment
     if 'SLURM_JOB_ID' in os.environ:
         # We're likely running on a server with SLURM
@@ -43,19 +49,21 @@ def get_arg_parser():
     parser.add_argument("--batch_size", type=int, default=default_batch_size, help="Batch size for training")
     parser.add_argument("--num_epochs", type=int, default=default_num_epochs, help="Number of epochs for training")
     parser.add_argument("--resize", type=int, default=default_resize, help="Image format that is being worked with ")
+    parser.add_argument("--loss", type=int, default= loss, help="Loss function applied to the model")
+    parser.add_argument("--distance_transform_weight", type=int, default=distance_transform_weight, help="Adds boundary information to loss function")
+    parser.add_argument("--learning_rate", type=int, default=learning_rate, help="Stepsize of the optimizer")
+    parser.add_argument("--val_size", type=int, default=val_size, help="Size of validation set, size trainset = 1- val_size")
+    parser.add_argument("--num_classes", type=int, default=num_classes, help="Number of classes to be predicted")
     return parser
 
 def main(args):
-    LEARNING_RATE = 5e-5
-    VAL_SIZE = 0.2
-    NUM_CLASSES = 34
 
     wandb.init(
         # set the wandb project where this run will be logged
         project="5LSM0",
         # track hyperparameters and run metadata
         config={
-            "learning_rate": LEARNING_RATE,
+            "learning_rate": args.learning_rate,
             "architecture": "Initial architecture",
             "dataset": "CityScapes",
             "epochs": args.num_epochs,
@@ -77,14 +85,14 @@ def main(args):
     target_transform = transforms.Compose([
         transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
         Lambda(edge_and_distance_transform),
-        OneHotEncode(num_classes=NUM_CLASSES),
+        OneHotEncode(num_classes=args.num_classes),
         #transforms.ToTensor(),
     ])
 
     full_training_data = Cityscapes(root=args.data_path, split='train', mode='fine', target_type='semantic',
                                     transform=transform, target_transform=target_transform)
     total_size = len(full_training_data)
-    train_size = int(total_size * (1- VAL_SIZE))
+    train_size = int(total_size * (1- args.val_size))
     val_size = total_size - train_size
     training_data, validation_data = random_split(full_training_data, [train_size, val_size])
 
@@ -98,19 +106,13 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    criterion = Loss_Functions(NUM_CLASSES,'Jaccard',False)
+    criterion = Loss_Functions(args.num_classes,args.loss,args.distance_transform_weight)
 
-    #criterion = WeightedJaccardLoss(num_classes = NUM_CLASSES)
-    #criterion = CombinedLoss(num_classes=NUM_CLASSES)
-    #criterion  = nn.CrossEntropyLoss(ignore_index=255)
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
-    num_epochs = args.num_epochs
-
-
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
 
     epoch_data = collections.defaultdict(list)
     # training/validation loop
-    for epoch in range(num_epochs):
+    for epoch in range(args.num_epochs):
         running_loss = 0.0
         for i, (inputs, labels) in enumerate(train_loader):
             optimizer.zero_grad()
@@ -143,14 +145,18 @@ def main(args):
 
         validation_loss = running_loss / len(val_loader)
         epoch_data['validation_loss'].append(validation_loss)
-        print(f"Epoch [{epoch + 1}/{num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
+        print(f"Epoch [{epoch + 1}/{args.num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
 
     state = {
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'loss criterion': criterion.state_dict(),
         'epoch_data': dict(epoch_data),
-        'num_epochs': num_epochs,
+        'num_epochs': args.num_epochs,
+        'Applied loss':args.loss,
+        'Weights applied':args.distance_transform_weight,
+        'Learning Rate':args.learning_rate,
+        'Validation size':args.val_size,
     }
 
     wandb.log(state)
