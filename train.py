@@ -15,7 +15,6 @@ from model import Model
 import wandb
 from torch.utils.data import random_split
 from torchvision.transforms import Lambda
-import utils
 try:
     import pretty_errors
 except ImportError:
@@ -28,7 +27,7 @@ def get_arg_parser():
     distance_transform_weight = True
     learning_rate = 5e-5
     val_size = 0.2
-    num_classes = 34
+    num_classes = 18
 
     # Detect the running environment
     if 'SLURM_JOB_ID' in os.environ:
@@ -63,32 +62,35 @@ def main(args):
         project="5LSM0",
         # track hyperparameters and run metadata
         config={
-            "learning_rate": args.learning_rate,
             "architecture": "Initial architecture",
             "dataset": "CityScapes",
+            "optimizer": "Adam",
+            "learning_rate": args.learning_rate,
             "epochs": args.num_epochs,
-            "optimizer":"Adam",
-            "batch_size":args.batch_size,
+            "batch_size": args.batch_size,
             "Image size": args.resize,
+            'num_epochs': args.num_epochs,
+            'Applied loss': args.loss,
+            'Weights applied': args.distance_transform_weight,
+            'Validation size': args.val_size,
         }
     )
     """define your model, trainingsloop optimitzer etc. here"""
     transform = transforms.Compose([
+        transforms.ToTensor(),
         transforms.Resize(args.resize),
         #transforms.Grayscale(num_output_channels=1),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+
+        #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+
     ])
-
-    # The Cityscapes dataset returns the target as PIL Image for 'semantic' target_type
-
     target_transform = transforms.Compose([
+        transforms.ToTensor(),
+        Lambda(reshape_targets),
         transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
         Lambda(edge_and_distance_transform),
         OneHotEncode(num_classes=args.num_classes),
-        #transforms.ToTensor(),
     ])
-
     full_training_data = Cityscapes(root=args.data_path, split='train', mode='fine', target_type='semantic',
                                     transform=transform, target_transform=target_transform)
     total_size = len(full_training_data)
@@ -101,13 +103,11 @@ def main(args):
     train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, num_workers=8)
     val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, num_workers=8)
 
-    model = Model()
-    initialize_weights(model)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = Model()
     model.to(device)
-
+    initialize_weights(model)
     criterion = Loss_Functions(args.num_classes,args.loss,args.distance_transform_weight)
-
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
 
     epoch_data = collections.defaultdict(list)
@@ -115,13 +115,12 @@ def main(args):
     for epoch in range(args.num_epochs):
         running_loss = 0.0
         for i, (inputs, labels) in enumerate(train_loader):
-            print('------------- \n inputs --------------')
-            print(inputs[0,:5,:5,:5])
-            print('------------- \n Labels --------------')
-            print(labels[0, :5, :5, :5])
+            #print('------------- \n inputs --------------')
+            #print(inputs[0,:5,:5,:5])
+            #print('------------- \n Labels --------------')
+            #print(labels[0, :5, :5, :5])
             optimizer.zero_grad()
-            #labels = (labels * 255).long().squeeze()  #
-            #labels = utils.map_id_to_train_id(labels).to(device)
+
             labels = labels.to(device)
             inputs = inputs.to(device)
             outputs = model(inputs)
@@ -139,8 +138,7 @@ def main(args):
         model.eval()
         running_loss = 0.0
         for inputs,labels in val_loader:
-            #labels = (labels * 255).long().squeeze()
-            #labels = utils.map_id_to_train_id(labels).to(device)
+
             labels = labels.to(device)
             inputs = inputs.to(device)
             outputs = model(inputs)
@@ -150,21 +148,13 @@ def main(args):
         validation_loss = running_loss / len(val_loader)
         epoch_data['validation_loss'].append(validation_loss)
         print(f"Epoch [{epoch + 1}/{args.num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
-
     state = {
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'loss criterion': criterion.state_dict(),
         'epoch_data': dict(epoch_data),
-        'num_epochs': args.num_epochs,
-        'Applied loss':args.loss,
-        'Weights applied':args.distance_transform_weight,
-        'Learning Rate':args.learning_rate,
-        'Validation size':args.val_size,
     }
-
     wandb.log(state)
-
     try:
         slurm_job_id = os.environ.get('SLURM_JOB_ID', 'default_job_id')
         torch.save(state, f'model_{slurm_job_id}.pth')

@@ -7,7 +7,13 @@ from torchvision.transforms import transforms
 from torchvision.transforms import functional as F
 #from scipy.ndimage import
 from PIL import Image
+import utils
 
+def reshape_targets(targets):
+    labels = (targets * 255).long()
+    labels = utils.map_id_to_train_id(labels)
+    # print(labels.shape)
+    return labels / 255
 class Loss_Functions(nn.Module):
     def __init__(self, num_classes,loss,Weight, weight=None, size_average=True):
         super(Loss_Functions, self).__init__()
@@ -122,7 +128,8 @@ class OneHotEncode(torch.nn.Module):
             additional_channels = target[1:].float()  # Extract and convert to float for consistency
             final_output = torch.cat([one_hot, additional_channels], dim=0)  # Concatenate along the channel dimension
 
-            #print('Final output shape:', final_output.shape)
+            print('Final output shape:', final_output.shape)
+
             return final_output
         else:
             return print('Error incorrect shape inserted in OneHot')
@@ -171,39 +178,42 @@ def initialize_weights(model):
             nn.init.constant_(module.weight, 1)
             nn.init.constant_(module.bias, 0)
 
-def detect_edges(image):
+def detect_edges(tensor_np):
     """Finds transitions in a PIL image and returns a PIL image of edges."""
-    image_np = np.array(image)
-    diff_x = np.abs(np.diff(image_np, axis=1))
-    diff_y = np.abs(np.diff(image_np, axis=0))
+    diff_x = np.abs(np.diff(tensor_np, axis=1))
+    diff_y = np.abs(np.diff(tensor_np, axis=0))
 
     edges_x = diff_x > 1
     edges_y = diff_y > 1
 
-    edges = np.zeros_like(image_np)
+    edges = np.zeros_like(tensor_np)
     edges[:, :-1] |= edges_x
     edges[:-1, :] |= edges_y
-
-    edges_pil = Image.fromarray(edges.astype(np.uint8))
-    return edges_pil
+    return edges
 
 
-def edge_and_distance_transform(image, num_levels_below_30_percent=5):
-    """Creates an image with 3 channels: original, detected edges, and the distance transform map."""
-    original_image_array = np.array(image)
-    if original_image_array.ndim != 2:
-        raise ValueError("The original image must be a single channel image.")
+def edge_and_distance_transform(tensor, num_levels_below_30_percent=5):
+    if tensor.ndim != 3 or tensor.shape[0] != 1:
+        raise ValueError("The input tensor must be a single channel tensor.")
+
+    # If the tensor is not on CPU or not a numpy array, convert it
+    if tensor.is_cuda:
+        tensor = tensor.cpu()
+    tensor_np = tensor.numpy().squeeze(0).astype(np.uint8)
+
     # Detect edges and calculate the distance transform
-    edge_detected_image = detect_edges(image)
-    edge_transform = np.array(edge_detected_image) * 255
+    edge_detected_image = detect_edges(tensor_np)
+
+    edge_transform = edge_detected_image * 255
     distance_transform_map = calculate_distance_transform(edge_transform, num_levels_below_30_percent)
+
     # Ensure all images are of the same dtype
-    original_image_array = original_image_array.astype(np.uint8)
     edge_transform = edge_transform.astype(np.uint8)
     distance_transform_map = distance_transform_map.astype(np.uint8)
-    # Combine into a 3-channel image
-    combined_image_array = np.stack((original_image_array, edge_transform, distance_transform_map), axis=0)
-    return combined_image_array
+
+    # stack all maps ( edge transform might be redundant dependant on final execution)
+    combined_image_array = np.stack((tensor_np, edge_transform, distance_transform_map), axis=0)
+    return torch.from_numpy(combined_image_array)
 
 
 def calculate_distance_transform(edge_detected_image, num_levels_below_30_percent):
