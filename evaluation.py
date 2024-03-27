@@ -11,7 +11,7 @@ from utils import *
 # except ImportError:
 #     pass
 
-model_path = 'models/model_5697465.pth'
+model_path = 'models/model_5708975.pth'
 
 def plot_losses(epoch_data):
     train_losses = epoch_data['loss']
@@ -73,6 +73,7 @@ def visualize_segmentation(model, dataloader, num_examples=5):
     """
     colors, class_names = names_colors_classes()
     model.eval()
+    plt.figure(figsize=(20, 15))
     with torch.no_grad():
         for i, (images, masks) in enumerate(dataloader):
             if i >= 1:
@@ -89,6 +90,7 @@ def visualize_segmentation(model, dataloader, num_examples=5):
             masks = masks.numpy()
 
             predicted = predicted.numpy()
+
 
             for j in range(4):
                 image = renormalize_image(images[j].transpose(1, 2, 0))
@@ -112,7 +114,7 @@ def visualize_segmentation(model, dataloader, num_examples=5):
                 plt.imshow(pred_mask_rgb)
                 plt.title("Model's Prediction")
                 plt.axis('off')
-
+            plt.subplots_adjust(wspace=0.05, hspace=0.1)
             plt.tight_layout()
             plt.show()
 

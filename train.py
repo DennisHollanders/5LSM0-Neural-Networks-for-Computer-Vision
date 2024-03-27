@@ -22,7 +22,7 @@ from torchvision.transforms import Lambda
 
 def get_arg_parser():
     parser = ArgumentParser()
-    loss = 'Jaccard'
+    loss = 'Dice'
     distance_transform_weight = True
     learning_rate = 5e-5
     val_size = 0.2
@@ -103,7 +103,7 @@ def main(args):
     model = Model()
     model.to(device)
     #initialize_weights(model)
-    #criterion = Loss_Functions(args.num_classes,args.loss,args.distance_transform_weight)
+    criterion = Loss_Functions(args.num_classes,args.loss,args.distance_transform_weight)
     criterion = torch.nn.CrossEntropyLoss(ignore_index=255)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
 
@@ -112,36 +112,40 @@ def main(args):
     for epoch in range(args.num_epochs):
         running_loss = 0.0
         for inputs, labels in train_loader:
-            labels = (labels* 255).long().squeeze().to(device)
-            #masks = map_id_to_train_id(masks)
+            labels = (labels * 255).long().squeeze()
+            labels = utils.map_id_to_train_id(labels).to(device)
+            inputs = inputs.to(device)
+            # masks = map_id_to_train_id(masks)
             optimizer.zero_grad()
             outputs = model(inputs)
+            print(outputs.shape)
+            #predicted = torch.argmax(outputs, 1)
 
-            loss = criterion(outputs,labels) #add .long.squeeze
+            loss = criterion(outputs, labels)  # add .long.squeeze
             loss.backward()
-            #print_gradients(model)
+            # print_gradients(model)
             optimizer.step()
             running_loss += loss.item()
-            print(running_loss)
 
-        epoch_loss = running_loss/len(train_loader)
+        epoch_loss = running_loss / len(train_loader)
         print(f'Epoch {epoch + 1}/{args.num_epochs}, Loss: {epoch_loss:.4f}')
         epoch_data['loss'].append(epoch_loss)
 
         model.eval()
         running_loss = 0.0
-        for inputs,labels in val_loader:
+        for inputs, labels in val_loader:
+            labels = (labels * 255).long().squeeze()
+            labels = utils.map_id_to_train_id(labels).to(device)
 
-            labels = labels.to(device)
             inputs = inputs.to(device)
-            predicted = model(inputs)
-            predicted = torch.argmax(outputs, 1)
-            loss = criterion(predicted, labels)
+            outputs = model(inputs)
+            #predicted = torch.argmax(outputs, 1)
+            loss = criterion(outputs, labels)
             running_loss += loss.item()
 
         validation_loss = running_loss / len(val_loader)
         epoch_data['validation_loss'].append(validation_loss)
-        print(f"Epoch [{epoch + 1}/{args.num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
+        print( f"Epoch [{epoch + 1}/{args.num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
     state = {
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),

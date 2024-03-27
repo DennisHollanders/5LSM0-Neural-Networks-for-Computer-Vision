@@ -14,7 +14,7 @@ def reshape_targets(targets):
     labels = utils.map_id_to_train_id(labels)
     return labels
 class Loss_Functions(nn.Module):
-    def __init__(self, num_classes,loss,Weight, weight=None, size_average=True):
+    def __init__(self, num_classes,loss,Weight, weight=None, size_average=True, ignore_index=255):
         super(Loss_Functions, self).__init__()
         self.num_classes = num_classes
         self.loss = loss
@@ -22,83 +22,48 @@ class Loss_Functions(nn.Module):
         self.weight = Weight
 
     def forward(self, predictions, targets):
-        targets = targets[:, :self.num_classes, :, :]
-        loss = 0.0
-        if self.weight:
-            distance_transform_weight = targets[:,-1, :, :].reshape(-1)
-        else:
-            distance_transform_weight = torch.ones_like(targets[:,-1, :, :]).reshape(-1)
-        for class_idx in range(self.num_classes):
-            input_flat = predictions[:, class_idx, :, :].reshape(-1)
-            target_flat = targets[:, class_idx, :, :].reshape(-1) *distance_transform_weight
 
-            intersection = (input_flat * target_flat).sum()
-            if self.loss == 'Dice':
-                dice_score = (2. * intersection + self.smooth) / (input_flat.sum() + target_flat.sum() + self.smooth)
-                loss += (1 - dice_score)
-            elif self.loss == 'Jaccard':
-                total = input_flat.sum() + target_flat.sum()
-                union = total - intersection
-                # Jaccard index
-                jaccard = (intersection + self.smooth) / (union + self.smooth)
-                loss += 1 - jaccard
-        print(loss)
-        return loss / self.num_classes
+        C = predictions.shape[1]
+        dice_loss = 0.0
+        for c in range(C):
+            if c != self.ignore_index:
+                pred_flat = predictions[:, c].contiguous().view(-1)
+                target_flat = (targets == c).float().view(-1)
 
+                intersection = (pred_flat * target_flat).sum()
+                dice_coef = (2. * intersection + self.smooth) / (pred_flat.sum() + target_flat.sum() + self.smooth)
 
-class WeightedJaccardLoss(nn.Module):
-    def __init__(self, num_classes):
-        super(WeightedJaccardLoss, self).__init__()
-        self.num_classes = num_classes
+                if self.weight is not None:
+                    dice_loss += (1 - dice_coef) * self.weight[c]
+                else:
+                    dice_loss += (1 - dice_coef)
+        """
+                targets = targets[:, :self.num_classes, :, :]
+                loss = 0.0
 
-    def forward(self, inputs, targets, smooth=1):
+                if self.weight:
+                    distance_transform_weight = targets[:,-1, :, :].reshape(-1)
+                else:
+                    distance_transform_weight = torch.ones_like(targets[:,-1, :, :]).reshape(-1)
+                for class_idx in range(self.num_classes):
+                    input_flat = predictions[:, class_idx, :, :].reshape(-1)
+                    target_flat = targets[:, class_idx, :, :].reshape(-1) *distance_transform_weight
 
-        #print('-------------- \n Started losses \n ---------------')
-        #print(targets.shape)
-        #print('num_classes', self.num_classes)
-        segmentation_targets = targets[:,:self.num_classes, :, :]
-        distance_transform_weights = targets[:, -1, :, :].unsqueeze(1)
-        #print('segmentation, distance map, inputs:',segmentation_targets.shape,distance_transform_weights.shape, inputs.shape)
-        segmentation = segmentation_targets * distance_transform_weights
-        #print('segmentation shape',segmentation.shape)
+                    intersection = (input_flat * target_flat).sum()
+                    if self.loss == 'Dice':
+                        dice_score = (2. * intersection + self.smooth) / (input_flat.sum() + target_flat.sum() + self.smooth)
+                        loss += (1 - dice_score)
+                    elif self.loss == 'Jaccard':
+                        total = input_flat.sum() + target_flat.sum()
+                        union = total - intersection
+                        # Jaccard index
+                        jaccard = (intersection + self.smooth) / (union + self.smooth)
+                        loss += 1 - jaccard
+                print(loss)
+                return loss / self.num_classes
+                """
+        return dice_loss / C
 
-        # Flatten label, prediction, and weight tensors
-        inputs_flat_weight = (inputs * distance_transform_weights).reshape(-1)
-        targets_flat_weight = (segmentation_targets * distance_transform_weights).reshape(-1)
-        #weights_flattened = distance_transform_weights.reshape(-1)
-
-        #print('input,targets,weights', inputs_flat_weight.shape,targets_flat_weight.shape,)
-
-        # Intersection is the sum of the element-wise product of inputs and targets, modulated by weights
-        intersection = (inputs_flat_weight * targets_flat_weight).sum()
-
-        # Calculate weighted sums for inputs and targets
-        weighted_inputs_sum = inputs_flat_weight.sum()
-        weighted_targets_sum = targets_flat_weight.sum()
-
-        # The size of the union is the sum of weighted inputs and targets minus the size of the weighted intersection
-        total = weighted_inputs_sum + weighted_targets_sum
-        union = total - intersection
-
-        # Weighted Jaccard index
-        jaccard = (intersection + smooth) / (union + smooth)
-        categorical_loss = -torch.sum(targets_flat_weight * torch.log(inputs_flat_weight + 1e-6), dim=0).mean()
-        jaccard_loss = 1-jaccard
-        # Weighted Jaccard loss
-        return categorical_loss # (categorical_loss + jaccard_loss) / 2
-
-    def categorical_cross_entropy_loss(self, predictions, labels, epsilon=1e-10):
-
-        # Apply epsilon to predictions to avoid log(0)
-        predictions = torch.clamp(predictions, epsilon, 1. - epsilon)
-
-        # Calculate pixel-wise loss
-        pixel_wise_loss = -torch.sum(labels * torch.log(predictions), dim=1)
-
-        # Calculate the average loss
-        loss = torch.mean(pixel_wise_loss)
-
-        return loss
 
 
 class OneHotEncode(torch.nn.Module):
@@ -134,30 +99,6 @@ class OneHotEncode(torch.nn.Module):
             return print('Error incorrect shape inserted in OneHot')
 
 
-class JaccardLoss(nn.Module):
-    def __init__(self, weight=None, size_average=True):
-        super(JaccardLoss, self).__init__()
-
-    def forward(self, inputs, targets, smooth=1):
-        targets = targets[:, :self.num_classes, :, :]
-
-        # flatten label and prediction tensors
-        inputs = inputs.reshape(-1)
-        targets = targets.reshape(-1)
-
-        # Intersection is the sum of the element-wise product
-        intersection = (inputs * targets).sum()
-
-        # The size of the union is the sum of all predictions plus
-        # the sum of all targets minus the size of the intersection
-        total = inputs.sum() + targets.sum()
-        union = total - intersection
-
-        # Jaccard index
-        jaccard = (intersection + smooth) / (union + smooth)
-
-        # Jaccard loss
-        return 1 - jaccard
 
 def print_gradients(model):
     for name, parameter in model.named_parameters():
