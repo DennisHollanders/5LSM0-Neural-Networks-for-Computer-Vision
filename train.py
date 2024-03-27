@@ -15,10 +15,10 @@ from model import Model
 import wandb
 from torch.utils.data import random_split
 from torchvision.transforms import Lambda
-# try:
-#     import pretty_errors
-# except ImportError:
-#     pass
+try:
+    import pretty_errors
+except ImportError:
+    pass
 
 def get_arg_parser():
     parser = ArgumentParser()
@@ -26,7 +26,7 @@ def get_arg_parser():
     distance_transform_weight = True
     learning_rate = 5e-5
     val_size = 0.2
-    num_classes = 18
+    num_classes = 19
 
     # Detect the running environment
     if 'SLURM_JOB_ID' in os.environ:
@@ -103,8 +103,8 @@ def main(args):
     model = Model()
     model.to(device)
     #initialize_weights(model)
-    criterion = Loss_Functions(args.num_classes,args.loss,args.distance_transform_weight)
-    criterion = torch.nn.CrossEntropyLoss(ignore_index=255)
+    criterion = Loss_Functions(args.num_classes,args.loss,args.distance_transform_weight,ignore_index=255)
+    #criterion = torch.nn.CrossEntropyLoss(ignore_index=255)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
 
     epoch_data = collections.defaultdict(list)
@@ -115,7 +115,7 @@ def main(args):
             labels = (labels * 255).long().squeeze()
             labels = utils.map_id_to_train_id(labels).to(device)
             inputs = inputs.to(device)
-            # masks = map_id_to_train_id(masks)
+
             optimizer.zero_grad()
             outputs = model(inputs)
             print(outputs.shape)

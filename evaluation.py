@@ -6,10 +6,10 @@ from model import Model
 from torchvision.transforms import Lambda
 from utils import *
 
-# try:
-#     import pretty_errors
-# except ImportError:
-#     pass
+try:
+    import pretty_errors
+except ImportError:
+    pass
 
 model_path = 'models/model_5708975.pth'
 

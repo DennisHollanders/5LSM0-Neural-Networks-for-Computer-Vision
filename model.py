@@ -24,7 +24,7 @@ class Model(nn.Module):
         self.d4 = decoder_block(128, 64)
 
         """ Classifier """
-        self.outputs = nn.Conv2d(64, 18, kernel_size=1, padding=0)
+        self.outputs = nn.Conv2d(64, 19, kernel_size=1, padding=0)
 
         #self.outputs = nn.softmax2d
 

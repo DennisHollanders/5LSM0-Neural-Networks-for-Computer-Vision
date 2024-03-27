@@ -14,12 +14,13 @@ def reshape_targets(targets):
     labels = utils.map_id_to_train_id(labels)
     return labels
 class Loss_Functions(nn.Module):
-    def __init__(self, num_classes,loss,Weight, weight=None, size_average=True, ignore_index=255):
+    def __init__(self, num_classes,loss,Weight, ignore_index=255, weight=None, size_average=True):
         super(Loss_Functions, self).__init__()
         self.num_classes = num_classes
         self.loss = loss
         self.smooth = 1
         self.weight = Weight
+        self.ignore_index =ignore_index
 
     def forward(self, predictions, targets):
 
@@ -34,7 +35,7 @@ class Loss_Functions(nn.Module):
                 dice_coef = (2. * intersection + self.smooth) / (pred_flat.sum() + target_flat.sum() + self.smooth)
 
                 if self.weight is not None:
-                    dice_loss += (1 - dice_coef) * self.weight[c]
+                    dice_loss += (1 - dice_coef)  #* self.weight[c]
                 else:
                     dice_loss += (1 - dice_coef)
         """
