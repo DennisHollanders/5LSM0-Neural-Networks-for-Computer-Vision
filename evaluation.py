@@ -4,13 +4,14 @@ from torch.utils.data import DataLoader
 from helper import *
 from model import Model
 from torchvision.transforms import Lambda
-import utils
-try:
-    import pretty_errors
-except ImportError:
-    pass
+from utils import *
 
-model_path = 'models/model_5661125.pth'
+# try:
+#     import pretty_errors
+# except ImportError:
+#     pass
+
+model_path = 'models/model_5697465.pth'
 
 def plot_losses(epoch_data):
     train_losses = epoch_data['loss']
@@ -38,75 +39,127 @@ def main():
 
     # Prepare the dataset and DataLoader
     transform = transforms.Compose([
-        #Add utils part to reshape targets:
-        transforms.reshape
-        transforms.Resize((256, 512)),
-        # transforms.Grayscale(num_output_channels=1),
+        transforms.Resize((256,512)),
         transforms.ToTensor(),
-
-        #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
     target_transform = transforms.Compose([
-        transforms.Resize((256, 512), interpolation=transforms.InterpolationMode.NEAREST),
-        Lambda(edge_and_distance_transform),
-        OneHotEncode(num_classes=34),
-        # transforms.ToTensor(),
+        transforms.Resize((256,512), interpolation=transforms.InterpolationMode.NEAREST),
+        transforms.ToTensor(),
+        # Lambda(reshape_targets),
+        # Lambda(edge_and_distance_transform),
+        # OneHotEncode(num_classes=args.num_classes),
     ])
+
     dataset = Cityscapes(root='City_Scapes/', split='val', mode='fine', target_type='semantic',
                          transform=transform, target_transform=target_transform)
-    loader = DataLoader(dataset, batch_size=1, shuffle=True)
+    loader = DataLoader(dataset, batch_size=4, shuffle=False)
 
     # Visualize predictions
-    visualize_predictions(loader, model, num_images=4, device=device)
+    visualize_segmentation(model,loader)
 
-def visualize_predictions(loader, model, num_images, device):
-    fig, axs = plt.subplots(3, num_images, figsize=(num_images * 4, 12))
 
+def visualize_segmentation(model, dataloader, num_examples=5):
+    """
+    Visualizes segmentation results from a given model using a dataloader.
+
+    Args:
+        model (torch.nn.Module): The segmentation model to visualize.
+        dataloader (torch.utils.data.DataLoader): Dataloader providing image-mask pairs.
+        num_examples (int, optional): Number of examples to visualize. Defaults to 5.
+
+    Returns:
+        None
+    """
+    colors, class_names = names_colors_classes()
     model.eval()
     with torch.no_grad():
-        for i, (inputs, labels) in enumerate(loader):
-            if i >= num_images:
+        for i, (images, masks) in enumerate(dataloader):
+            if i >= 1:
                 break
-            #print(np.unique(labels))
-            print(labels.shape, '1')
-            labels = labels.long().squeeze()
-            labels = utils.map_id_to_train_id(labels).to(device)
-            inputs = inputs.to(device)
-            outputs = model(inputs)
-            _, preds = torch.max(outputs, 1)
-            print(labels.shape,'e')
+            print('before', masks.shape)
+            masks = (masks * 255).long().squeeze()  # *255 because the id are normalized between 0-1
+            masks = utils.map_id_to_train_id(masks)
+            print('after',masks.shape)
+            outputs = model(images)
+            #outputs = torch.softmax(outputs, dim=1)
+            predicted = torch.argmax(outputs, 1)
 
-            # Convert to numpy for visualization and transpose dimensions
-            inputs_np = inputs.cpu().squeeze().numpy()
-            # Transpose the dimensions from (Channels, Height, Width) to (Height, Width, Channels)
-            inputs_np = np.transpose(inputs_np, (1, 2, 0))
+            images = images.numpy()
+            masks = masks.numpy()
 
-            labels = torch.argmax(labels[:34], dim=1)
-            print('label size:', labels.shape)
+            predicted = predicted.numpy()
 
-            labels_np = labels.cpu().squeeze() *255 #.numpy()
-            preds_np = preds.cpu().squeeze().numpy()
-            print(inputs_np.shape,labels_np.shape, preds_np.shape)
-            #print('inputs', inputs_np,'labels', labels_np,'preds', preds_np)
-            print(np.unique(labels_np), print(np.unique(preds_np)))
-            # Original Image
-            axs[0, i].imshow(inputs_np)
-            axs[0, i].set_title('Original Image')
-            axs[0, i].axis('off')
+            for j in range(4):
+                image = renormalize_image(images[j].transpose(1, 2, 0))
+                mask_rgb = mask_to_rgb(masks[j], colors)
+                pred_mask_rgb = mask_to_rgb(predicted[j], colors)
 
-            # True Segmentation
-            axs[1, i].imshow(labels_np)
-            axs[1, i].set_title('True Segmentation')
-            axs[1, i].axis('off')
+                # Original Image
+                plt.subplot(num_examples, 3, j*3 + 1)
+                plt.imshow(image)
+                plt.title('Image')
+                plt.axis('off')
 
-            # Model's Prediction
-            axs[2, i].imshow(preds_np)
-            axs[2, i].set_title("Model's Prediction")
-            axs[2, i].axis('off')
+                # Ground Truth Mask
+                plt.subplot(num_examples, 3, j*3 + 2)
+                plt.imshow(mask_rgb)
+                plt.title('Ground Truth Mask')
+                plt.axis('off')
 
-    plt.tight_layout()
-    plt.show()
+                # Model's Prediction
+                plt.subplot(num_examples, 3, j*3 + 3)
+                plt.imshow(pred_mask_rgb)
+                plt.title("Model's Prediction")
+                plt.axis('off')
 
+            plt.tight_layout()
+            plt.show()
+
+def renormalize_image(image):
+    """
+    Renormalizes the image to its original range.
+
+    Args:
+        image (numpy.ndarray): Image tensor to renormalize.
+
+    Returns:
+        numpy.ndarray: Renormalized image tensor.
+    """
+    mean = [0.5, 0.5, 0.5]
+    std = [0.5, 0.5, 0.5]
+    renormalized_image = image * std + mean
+    return renormalized_image
+def mask_to_rgb(mask, class_to_color):
+    """
+    Converts a numpy mask with multiple classes indicated by integers to a color RGB mask.
+
+    Parameters:
+        mask (numpy.ndarray): The input mask where each integer represents a class.
+        class_to_color (dict): A dictionary mapping class integers to RGB color tuples.
+
+    Returns:
+        numpy.ndarray: RGB mask where each pixel is represented as an RGB tuple.
+    """
+    print('in mask to rgb', mask.shape)
+
+    # Ensure mask is 2D
+    mask = mask.squeeze()
+    print('in mask to rgb reshaped', mask.shape)
+
+    height, width = mask.shape
+
+    # Initialize an empty RGB mask
+    rgb_mask = np.zeros((height, width, 3), dtype=np.uint8)
+
+    # Iterate over each class and assign corresponding RGB color
+    for class_idx, color in class_to_color.items():
+        # Mask pixels belonging to the current class
+        class_pixels = mask == class_idx
+        # Assign RGB color to the corresponding pixels
+        rgb_mask[class_pixels] = color
+
+    return rgb_mask
 
 if __name__ == "__main__":
     main()

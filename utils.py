@@ -88,3 +88,22 @@ def map_id_to_train_id(label_id):
         # replace the value in the tensor with the train id if the value in the input tensor is equal to the id of the label
         train_id_tensor[label_id == label.id] = label.trainId
     return train_id_tensor
+
+def names_colors_classes():
+    colors = {}
+    class_names = {}
+
+    for label in LABELS:
+        # Adjust based on whether you're using id, trainId, or another identifier
+        if label.trainId != 255:  # Ignoring the special case
+            colors[label.trainId] = label.color
+            class_names[label.trainId] = label.name
+
+    # Handling unlabeled or special cases
+    colors[255] = (0, 0, 0)
+    class_names[255] = 'unlabeled'
+
+    # Add a default entry for missing keys if needed
+    class_names[20] = 'SomeDefaultClassName'
+
+    return colors, class_names

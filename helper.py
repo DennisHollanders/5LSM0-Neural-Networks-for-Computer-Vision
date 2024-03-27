@@ -10,10 +10,9 @@ from PIL import Image
 import utils
 
 def reshape_targets(targets):
-    labels = (targets * 255).long()
+    labels = (targets * 255).long().squeeze()
     labels = utils.map_id_to_train_id(labels)
-    # print(labels.shape)
-    return labels / 255
+    return labels
 class Loss_Functions(nn.Module):
     def __init__(self, num_classes,loss,Weight, weight=None, size_average=True):
         super(Loss_Functions, self).__init__()
@@ -117,10 +116,10 @@ class OneHotEncode(torch.nn.Module):
         #print('target.shape[0]=',target.shape[0])
         # Assume target is a tensor here, with shape [C, H, W]
         if len(target.shape) == 3:
-            #print('shape =3 ')
+            print(target.shape)
             label = target[0].long()  # Extract segmentation labels; assuming they are in the first channel
             one_hot = torch.nn.functional.one_hot(label, num_classes=self.num_classes)  # One-hot encoding
-            #print('Shape after encoding:',one_hot.shape)
+            print('Shape after encoding:',one_hot.shape)
             one_hot = one_hot.permute(2, 0, 1).float()  # Reorder dimensions to [C, H, W]
             #print('target shape after permute',one_hot.shape)
 
