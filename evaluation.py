@@ -11,7 +11,7 @@ try:
 except ImportError:
     pass
 
-model_path = 'models/model_5708975.pth'
+model_path = 'models/model_5715341.pth'
 
 def plot_losses(epoch_data):
     train_losses = epoch_data['loss']
@@ -46,8 +46,8 @@ def main():
     target_transform = transforms.Compose([
         transforms.Resize((256,512), interpolation=transforms.InterpolationMode.NEAREST),
         transforms.ToTensor(),
-        # Lambda(reshape_targets),
-        # Lambda(edge_and_distance_transform),
+        Lambda(reshape_targets),
+        Lambda(edge_and_distance_transform),
         # OneHotEncode(num_classes=args.num_classes),
     ])
 
@@ -73,22 +73,25 @@ def visualize_segmentation(model, dataloader, num_examples=5):
     """
     colors, class_names = names_colors_classes()
     model.eval()
-    plt.figure(figsize=(20, 15))
+    plt.figure(figsize=(15, 10))
     with torch.no_grad():
         for i, (images, masks) in enumerate(dataloader):
             if i >= 1:
                 break
-            print('before', masks.shape)
-            masks = (masks * 255).long().squeeze()  # *255 because the id are normalized between 0-1
-            masks = utils.map_id_to_train_id(masks)
-            print('after',masks.shape)
-            outputs = model(images)
-            #outputs = torch.softmax(outputs, dim=1)
-            predicted = torch.argmax(outputs, 1)
+            if masks.shape[1] > 1:
+                print('edge mask should be visualized')
+                visualize_edge_masks(masks, num_examples)
+                masks = masks[:,0,:,:]
 
+            print('shape =', masks.shape)
+            print('after',masks.shape)
+
+
+            # prep tensor to numpy to be plotted
+            outputs = model(images)
+            predicted = torch.argmax(outputs, 1)
             images = images.numpy()
             masks = masks.numpy()
-
             predicted = predicted.numpy()
 
 
@@ -162,6 +165,38 @@ def mask_to_rgb(mask, class_to_color):
         rgb_mask[class_pixels] = color
 
     return rgb_mask
+
+def visualize_edge_masks(masks, num_examples):
+    print('shape masks:::::::', masks.shape)
+    plt.figure(figsize=(15, 10))
+    masks = masks.numpy()
+    for j in range(4):
+        #image = renormalize_image(images[j].transpose(1, 2, 0))
+        #mask_rgb = mask_to_rgb(masks[j], colors)
+        #pred_mask_rgb = mask_to_rgb(predicted[j], colors)
+
+        print(masks[j,0,:,:].shape)
+        # Original Image
+        plt.subplot(num_examples, 3, j * 3 + 1)
+        plt.imshow(masks[j,0,:,:])
+        plt.title('Mask')
+        plt.axis('off')
+
+        # Ground Truth Mask
+        plt.subplot(num_examples, 3, j * 3 + 2)
+        plt.imshow(masks[j,1,:,:], cmap='gray')
+        plt.title('Edge mask')
+        plt.axis('off')
+
+        # Model's Prediction
+        plt.subplot(num_examples, 3, j * 3 + 3)
+        plt.imshow(masks[j,2,:,:])
+        plt.title("Distance transform map")
+        plt.axis('off')
+    plt.subplots_adjust(wspace=0.05, hspace=0.1)
+    plt.tight_layout()
+    plt.show()
+
 
 if __name__ == "__main__":
     main()

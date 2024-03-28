@@ -83,9 +83,8 @@ def main(args):
     target_transform = transforms.Compose([
         transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
         transforms.ToTensor(),
-        #Lambda(reshape_targets),
-        #Lambda(edge_and_distance_transform),
-        #OneHotEncode(num_classes=args.num_classes),
+        Lambda(reshape_targets),
+        Lambda(edge_and_distance_transform),
     ])
 
     full_training_data = Cityscapes(root=args.data_path, split='train', mode='fine', target_type='semantic',
@@ -112,13 +111,13 @@ def main(args):
     for epoch in range(args.num_epochs):
         running_loss = 0.0
         for inputs, labels in train_loader:
-            labels = (labels * 255).long().squeeze()
-            labels = utils.map_id_to_train_id(labels).to(device)
+            #labels = (labels * 255).long().squeeze()
+            #labels = utils.map_id_to_train_id(labels).to(device)
+            labels = labels.to(device).long().squeeze()
             inputs = inputs.to(device)
 
             optimizer.zero_grad()
             outputs = model(inputs)
-            print(outputs.shape)
             #predicted = torch.argmax(outputs, 1)
 
             loss = criterion(outputs, labels)  # add .long.squeeze
@@ -134,9 +133,9 @@ def main(args):
         model.eval()
         running_loss = 0.0
         for inputs, labels in val_loader:
-            labels = (labels * 255).long().squeeze()
-            labels = utils.map_id_to_train_id(labels).to(device)
-
+            #labels = (labels * 255).long().squeeze()
+            #labels = utils.map_id_to_train_id(labels).to(device)
+            labels = labels.to(device).long().squeeze()
             inputs = inputs.to(device)
             outputs = model(inputs)
             #predicted = torch.argmax(outputs, 1)
