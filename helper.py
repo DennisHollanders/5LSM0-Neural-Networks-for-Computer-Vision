@@ -43,7 +43,7 @@ class Loss_Functions(nn.Module):
         jaccard_coef = (intersection + self.smooth) / (union + self.smooth)
         return 1 - jaccard_coef
         """
-        print(pred_flat.shape,target_flat.shape,distance_transform_map.shape)
+        #print(pred_flat.shape,target_flat.shape,distance_transform_map.shape)
         # Applying weights to intersection and union calculations
         weighted_intersection = (pred_flat * target_flat * distance_transform_map).sum()
         weighted_union = (pred_flat * distance_transform_map).sum() + (target_flat * distance_transform_map).sum() - weighted_intersection
