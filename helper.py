@@ -17,53 +17,45 @@ class Loss_Functions(nn.Module):
     def __init__(self, num_classes,loss,Weight, ignore_index=255, weight=None, size_average=True):
         super(Loss_Functions, self).__init__()
         self.num_classes = num_classes
-        self.loss = loss
+        self.loss_type = loss
         self.smooth = 1
         self.weight = Weight
         self.ignore_index =ignore_index
 
-    def forward(self, predictions, targets):
+    def dice_loss(self, pred_flat, target_flat):
+        intersection = (pred_flat * target_flat).sum()
+        dice_coef = (2. * intersection + self.smooth) / (pred_flat.sum() + target_flat.sum() + self.smooth)
+        return 1 - dice_coef
 
-        C = predictions.shape[1]
-        dice_loss = 0.0
+    def jaccard_loss(self, pred_flat, target_flat):
+        intersection = (pred_flat * target_flat).sum()
+        union = pred_flat.sum() + target_flat.sum() - intersection
+        jaccard_coef = (intersection + self.smooth) / (union + self.smooth)
+        return 1 - jaccard_coef
+
+    def forward(self, pred, target):
+        # if self.weight is not None:
+        #     self.weight = self.weight.to(pred.device)
+        C = pred.shape[1]
+        total_loss = 0.0
         for c in range(C):
             if c != self.ignore_index:
-                pred_flat = predictions[:, c].contiguous().view(-1)
-                target_flat = (targets == c).float().view(-1)
+                pred_flat = pred[:, c].contiguous().view(-1)
+                target_flat = (target == c).float().view(-1)
 
-                intersection = (pred_flat * target_flat).sum()
-                dice_coef = (2. * intersection + self.smooth) / (pred_flat.sum() + target_flat.sum() + self.smooth)
+                if self.loss_type == 'Dice':
+                    loss = self.dice_loss(pred_flat, target_flat)
+                elif self.loss_type == 'Jaccard':
+                    loss = self.jaccard_loss(pred_flat, target_flat)
+                else:
+                    raise ValueError("Unsupported loss type. Use 'dice' or 'jaccard'.")
 
                 if self.weight is not None:
-                    dice_loss += (1 - dice_coef)  #* self.weight[c]
+                    total_loss += loss  #* self.weight[c]
                 else:
-                    dice_loss += (1 - dice_coef)
-        """
-                targets = targets[:, :self.num_classes, :, :]
-                loss = 0.0
+                    total_loss += loss
 
-                if self.weight:
-                    distance_transform_weight = targets[:,-1, :, :].reshape(-1)
-                else:
-                    distance_transform_weight = torch.ones_like(targets[:,-1, :, :]).reshape(-1)
-                for class_idx in range(self.num_classes):
-                    input_flat = predictions[:, class_idx, :, :].reshape(-1)
-                    target_flat = targets[:, class_idx, :, :].reshape(-1) *distance_transform_weight
-
-                    intersection = (input_flat * target_flat).sum()
-                    if self.loss == 'Dice':
-                        dice_score = (2. * intersection + self.smooth) / (input_flat.sum() + target_flat.sum() + self.smooth)
-                        loss += (1 - dice_score)
-                    elif self.loss == 'Jaccard':
-                        total = input_flat.sum() + target_flat.sum()
-                        union = total - intersection
-                        # Jaccard index
-                        jaccard = (intersection + self.smooth) / (union + self.smooth)
-                        loss += 1 - jaccard
-                print(loss)
-                return loss / self.num_classes
-                """
-        return dice_loss / C
+        return total_loss / C
 
 
 

@@ -22,7 +22,7 @@ except ImportError:
 
 def get_arg_parser():
     parser = ArgumentParser()
-    loss = 'Dice'
+    loss = 'Jaccard'
     distance_transform_weight = True
     learning_rate = 5e-5
     val_size = 0.2
@@ -32,7 +32,7 @@ def get_arg_parser():
     if 'SLURM_JOB_ID' in os.environ:
         default_data_path = "/gpfs/work5/0/jhstue005/JHS_data/CityScapes"
         default_batch_size = 16
-        default_num_epochs = 5
+        default_num_epochs = 20
         default_resize = (256, 512)
         default_pin_memory = True
     else:
