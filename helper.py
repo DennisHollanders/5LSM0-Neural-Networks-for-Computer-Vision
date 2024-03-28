@@ -21,6 +21,7 @@ class Loss_Functions(nn.Module):
         self.smooth = 1
         self.weight = Weight
         self.ignore_index =ignore_index
+        self.epsilon = 1e-4
 
     def dice_loss(self, pred_flat, target_flat, distance_transform_map):
         """
@@ -56,19 +57,21 @@ class Loss_Functions(nn.Module):
         #print('target shape in loss function',target.shape)
         if target.shape[1] > 1:
             target_segmentation = target[:,0,:,:]
-            Distance_transform_weight = target[:,1,:,:]
+            distance_transform_map = target[:,1,:,:]
+
+            inverted_distance_transform_map = 1.0 / (distance_transform_map + self.epsilon)
         C = pred.shape[1]
         total_loss = 0.0
         for c in range(C):
             if c != self.ignore_index:
                 pred_flat = pred[:, c].contiguous().reshape(-1) # or apply view
                 target_flat = (target_segmentation == c).float().reshape(-1)
-                Distance_transform_weight_flat = Distance_transform_weight.reshape(-1)
+                inverted_distance_transform_map_flat = inverted_distance_transform_map.reshape(-1)
 
                 if self.loss_type == 'Dice':
-                    loss = self.dice_loss(pred_flat, target_flat,Distance_transform_weight_flat)
+                    loss = self.dice_loss(pred_flat, target_flat,inverted_distance_transform_map_flat)
                 elif self.loss_type == 'Jaccard':
-                    loss = self.jaccard_loss(pred_flat, target_flat,Distance_transform_weight_flat)
+                    loss = self.jaccard_loss(pred_flat, target_flat,inverted_distance_transform_map_flat)
                 else:
                     raise ValueError("Unsupported loss type. Use 'dice' or 'jaccard'.")
                 total_loss += loss
