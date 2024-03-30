@@ -101,50 +101,71 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = Model()
     model.to(device)
-    #initialize_weights(model)
+    initialize_weights(model)
     criterion = Loss_Functions(args.num_classes,args.loss,args.distance_transform_weight,ignore_index=255)
-    #criterion = torch.nn.CrossEntropyLoss(ignore_index=255)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
 
     epoch_data = collections.defaultdict(list)
     # training/validation loop
     for epoch in range(args.num_epochs):
         running_loss = 0.0
+        iou_sum = 0.0
+        edge_accuracy_sum = 0.0
         for inputs, labels in train_loader:
-            #labels = (labels * 255).long().squeeze()
-            #labels = utils.map_id_to_train_id(labels).to(device)
+
             labels = labels.to(device).long().squeeze()
             inputs = inputs.to(device)
-
             optimizer.zero_grad()
             outputs = model(inputs)
-            #predicted = torch.argmax(outputs, 1)
-
-            loss = criterion(outputs, labels)  # add .long.squeeze
+            loss = criterion(outputs, labels)
             loss.backward()
-            # print_gradients(model)
             optimizer.step()
             running_loss += loss.item()
 
+            distance_transform_map, ground_truth_labels = labels[:,2,:,:],labels[:,0,:,:]
+            #print(distance_transform_map.shape,ground_truth_labels.shape,labels.shape,inputs.shape, outputs.shape)
+            # comparison
+            preds = torch.argmax(outputs, dim=1)
+            #print(preds.shape,outputs.shape)
+            iou_sum += calculate_iou(preds, ground_truth_labels, num_classes=args.num_classes)
+            edge_accuracy_sum += calculate_accuracy_near_edges(distance_transform_map, preds, ground_truth_labels, threshold=10)
+
         epoch_loss = running_loss / len(train_loader)
+        epoch_edge = edge_accuracy_sum / len(train_loader)
+        epoch_iou = iou_sum / len(train_loader)
+        # epoch_edge_accuracy = edge_accuracy_sum / num_batches
         print(f'Epoch {epoch + 1}/{args.num_epochs}, Loss: {epoch_loss:.4f}')
+        print("edge: {epoch_edge:.4f}, iou: {validation_iou:.4f} \n")
         epoch_data['loss'].append(epoch_loss)
+        epoch_data['edge'].append(epoch_edge)
+        epoch_data['iou'].append(epoch_iou)
 
         model.eval()
         running_loss = 0.0
+        iou_sum = 0.0
+        edge_accuracy_sum = 0.0
         for inputs, labels in val_loader:
-            #labels = (labels * 255).long().squeeze()
-            #labels = utils.map_id_to_train_id(labels).to(device)
             labels = labels.to(device).long().squeeze()
             inputs = inputs.to(device)
             outputs = model(inputs)
-            #predicted = torch.argmax(outputs, 1)
+
             loss = criterion(outputs, labels)
             running_loss += loss.item()
 
+            distance_transform_map, ground_truth_labels = labels[:, 2, :, :], labels[:, 0, :, :]
+            # comparison
+            preds = torch.argmax(outputs, dim=1)
+            iou_sum += calculate_iou(preds, ground_truth_labels, num_classes=args.num_classes)
+            edge_accuracy_sum += calculate_accuracy_near_edges(distance_transform_map, preds, ground_truth_labels,threshold=10)
+
+        epoch_edge = edge_accuracy_sum / len(train_loader)
+        epoch_iou = iou_sum / len(train_loader)
         validation_loss = running_loss / len(val_loader)
         epoch_data['validation_loss'].append(validation_loss)
+        epoch_data['validation_edge'].append(epoch_edge)
+        epoch_data['validation_iou'].append(epoch_iou)
         print( f"Epoch [{epoch + 1}/{args.num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
+        print( "Validation edge: {epoch_edge:.4f}, Validation iou: {validation_iou:.4f} \n")
     state = {
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),

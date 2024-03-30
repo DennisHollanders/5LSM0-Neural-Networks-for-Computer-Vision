@@ -160,3 +160,42 @@ def calculate_distance_transform(edge_detected_image, num_levels_below_30_percen
         return quantized_distance_transform
     else:
         return distance_transform
+
+
+def calculate_iou(preds, labels, num_classes):
+    ious = []
+    preds = preds.reshape(-1)
+    labels = labels.reshape(-1)
+    #print('in iou',preds.shape, labels.shape)
+    for cls in range(num_classes):
+        pred_inds = preds == cls
+        target_inds = labels == cls
+        #print(pred_inds.shape, target_inds.shape)
+        intersection = (pred_inds & target_inds).sum().item()
+        union = (pred_inds | target_inds).sum().item()
+
+        if union == 0:
+            # Ignore this class if there are no ground truth or predictions (prevents divide by zero)
+            continue
+
+        iou = float(intersection) / float(max(union, 1))
+        ious.append(iou)
+
+    mean_iou = sum(ious) / len(ious) if ious else 1.0  # return 1.0 if all classes are ignored
+    return mean_iou
+
+def calculate_accuracy_near_edges(distance_transform_map, predicted_labels, ground_truth_labels, threshold=10):
+    # Identify pixels within the specified distance from the nearest edge
+    near_edge_pixels = distance_transform_map <= threshold
+
+    # Select the corresponding predictions and ground truth labels for those pixels
+    predicted_near_edges = predicted_labels[near_edge_pixels]
+    ground_truth_near_edges = ground_truth_labels[near_edge_pixels]
+
+    # Calculate the number of correctly classified pixels
+    correct_predictions = (predicted_near_edges == ground_truth_near_edges).sum()
+
+    # Calculate accuracy as the ratio of correctly classified pixels to the total number of near-edge pixels
+    accuracy = correct_predictions / len(predicted_near_edges) if len(predicted_near_edges) > 0 else 0
+
+    return accuracy
