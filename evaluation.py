@@ -11,7 +11,7 @@ try:
 except ImportError:
     pass
 
-model_path = 'models/model_5715341.pth'
+model_path = 'models/model_5735989.pth'
 
 def plot_losses(epoch_data):
     train_losses = epoch_data['loss']
@@ -35,6 +35,8 @@ def main():
 
     # Extract and plot the training and validation losses
     epoch_data = state['epoch_data']
+    loss_criterion = state['loss criterion']
+    print(epoch_data,loss_criterion)
     #plot_losses(epoch_data)
 
     # Prepare the dataset and DataLoader

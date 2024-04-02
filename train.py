@@ -135,7 +135,7 @@ def main(args):
         epoch_iou = iou_sum / len(train_loader)
         # epoch_edge_accuracy = edge_accuracy_sum / num_batches
         print(f'Epoch {epoch + 1}/{args.num_epochs}, Loss: {epoch_loss:.4f}')
-        print("edge: {epoch_edge:.4f}, iou: {validation_iou:.4f} \n")
+        print(f"edge: {epoch_edge:.4f}, iou: {epoch_iou:.4f}")
         epoch_data['loss'].append(epoch_loss)
         epoch_data['edge'].append(epoch_edge)
         epoch_data['iou'].append(epoch_iou)
@@ -165,12 +165,12 @@ def main(args):
         epoch_data['validation_edge'].append(epoch_edge)
         epoch_data['validation_iou'].append(epoch_iou)
         print( f"Epoch [{epoch + 1}/{args.num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
-        print( "Validation edge: {epoch_edge:.4f}, Validation iou: {validation_iou:.4f} \n")
+        print( f"Validation edge: {epoch_edge:.4f}, Validation iou: {epoch_iou:.4f} \n")
     state = {
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'loss criterion': criterion.state_dict(),
-        'epoch_data': dict(epoch_data),
+        'epoch_data': epoch_data.state_dict(),
     }
 
     try:
@@ -180,9 +180,7 @@ def main(args):
     except:
         torch.save(state, f'model.pth')
 
-
 if __name__ == "__main__":
-    # Get the arguments
     parser = get_arg_parser()
     args = parser.parse_args()
     #print(args,parser)

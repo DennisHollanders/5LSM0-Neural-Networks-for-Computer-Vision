@@ -142,9 +142,9 @@ def calculate_distance_transform(edge_detected_image, num_levels_below_30_percen
     inverted_distance_transform = 1 - normalized_distance_transform
 
     distance_transform = (inverted_distance_transform * 255).astype(np.uint8)
-    Quantization = False
+    Quantization = True
     if Quantization:
-        threshold_30_percent = 0.05 * max_distance
+        threshold_30_percent = 0.2 * max_distance
         normalized_distance_transform = distance_transform / max_distance * 255
 
         quantized_distance_transform = np.zeros_like(normalized_distance_transform)
