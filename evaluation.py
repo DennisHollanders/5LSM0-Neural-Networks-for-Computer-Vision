@@ -5,13 +5,14 @@ from helper import *
 from model import Model
 from torchvision.transforms import Lambda
 from utils import *
+import torch.nn as nn
 
 try:
     import pretty_errors
 except ImportError:
     pass
 
-model_path = 'models/model_5735989.pth'
+model_path = 'models/DiceLoss.pth'
 
 def plot_losses(epoch_data):
     train_losses = epoch_data['loss']
@@ -32,6 +33,16 @@ def main():
     state = torch.load(model_path, map_location=device)
     model.load_state_dict(state["model_state_dict"])
     model.to(device)
+
+    # Print model summary to check parameter sizes and types
+    print("Model Summary:")
+    for name, param in model.named_parameters():
+        print(f"{name}: {param.size()}, dtype={param.dtype}")
+
+    # Check if any additional items are saved in the state that are not needed
+    print("\nItems in saved state:")
+    for key in state.keys():
+        print(f"{key}: type({type(state[key])})")
 
     # Extract and plot the training and validation losses
     epoch_data = state['epoch_data']
@@ -91,6 +102,7 @@ def visualize_segmentation(model, dataloader, num_examples=5):
 
             # prep tensor to numpy to be plotted
             outputs = model(images)
+            outputs = nn.functional.softmax(outputs, dim=1)
             predicted = torch.argmax(outputs, 1)
             images = images.numpy()
             masks = masks.numpy()

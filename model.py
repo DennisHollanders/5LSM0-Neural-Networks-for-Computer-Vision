@@ -26,8 +26,6 @@ class Model(nn.Module):
         """ Classifier """
         self.outputs = nn.Conv2d(64, 19, kernel_size=1, padding=0)
 
-        #self.outputs = nn.softmax2d
-
     def forward(self, inputs):
         """ Encoder """
         s1, p1 = self.e1(inputs)
@@ -46,8 +44,6 @@ class Model(nn.Module):
 
         """ Segmentation output """
         outputs = self.outputs(d4)
-        outputs = nn.functional.softmax(outputs, dim =1 )
-
         return outputs
 
 class conv_block(nn.Module):

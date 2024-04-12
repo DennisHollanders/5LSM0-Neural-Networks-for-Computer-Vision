@@ -15,6 +15,7 @@ from model import Model
 import wandb
 from torch.utils.data import random_split
 from torchvision.transforms import Lambda
+import torch.nn as nn
 try:
     import pretty_errors
 except ImportError:
@@ -80,6 +81,7 @@ def main(args):
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
+    
     target_transform = transforms.Compose([
         transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
         transforms.ToTensor(),
@@ -117,6 +119,7 @@ def main(args):
             inputs = inputs.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
+            outputs = nn.functional.softmax(outputs, dim=1)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -129,7 +132,7 @@ def main(args):
             #print(preds.shape,outputs.shape)
             iou_sum += calculate_iou(preds, ground_truth_labels, num_classes=args.num_classes)
             edge_accuracy_sum += calculate_accuracy_near_edges(distance_transform_map, preds, ground_truth_labels, threshold=10)
-
+        print_gradients(model)
         epoch_loss = running_loss / len(train_loader)
         epoch_edge = edge_accuracy_sum / len(train_loader)
         epoch_iou = iou_sum / len(train_loader)
@@ -148,7 +151,7 @@ def main(args):
             labels = labels.to(device).long().squeeze()
             inputs = inputs.to(device)
             outputs = model(inputs)
-
+            outputs = nn.functional.softmax(outputs, dim=1)
             loss = criterion(outputs, labels)
             running_loss += loss.item()
 
@@ -166,19 +169,26 @@ def main(args):
         epoch_data['validation_iou'].append(epoch_iou)
         print( f"Epoch [{epoch + 1}/{args.num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
         print( f"Validation edge: {epoch_edge:.4f}, Validation iou: {epoch_iou:.4f} \n")
+
+    auxiliary_state = {
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss_criterion_state_dict': criterion.state_dict(),
+        'epoch_data': dict(epoch_data),
+    }
     state = {
         'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'loss criterion': criterion.state_dict(),
-        'epoch_data': dict(epoch_data),
+        auxiliary_state: auxiliary_state
     }
 
     try:
         slurm_job_id = os.environ.get('SLURM_JOB_ID', 'default_job_id')
         torch.save(state, f'model_{slurm_job_id}.pth')
+        #torch.save(auxiliary_state, f'model_{slurm_job_id}.pth')
+
         wandb.log(state)
     except:
         torch.save(state, f'model.pth')
+        #torch.save(auxiliary_state, f'model.pth')
 
 if __name__ == "__main__":
     parser = get_arg_parser()

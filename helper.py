@@ -14,7 +14,7 @@ def reshape_targets(targets):
     labels = utils.map_id_to_train_id(labels)
     return labels
 class Loss_Functions(nn.Module):
-    def __init__(self, num_classes,loss,Weight, ignore_index=255, weight=None, size_average=True):
+    def __init__(self, num_classes,loss,Weight, ignore_index=255):
         super(Loss_Functions, self).__init__()
         self.num_classes = num_classes
         self.loss_type = loss
