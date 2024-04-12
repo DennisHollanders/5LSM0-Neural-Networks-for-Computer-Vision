@@ -170,25 +170,24 @@ def main(args):
         print( f"Epoch [{epoch + 1}/{args.num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
         print( f"Validation edge: {epoch_edge:.4f}, Validation iou: {epoch_iou:.4f} \n")
 
-    auxiliary_state = {
+    additional_info = {
         'optimizer_state_dict': optimizer.state_dict(),
         'loss_criterion_state_dict': criterion.state_dict(),
         'epoch_data': dict(epoch_data),
     }
-    state = {
-        'model_state_dict': model.state_dict(),
-        auxiliary_state: auxiliary_state
-    }
 
     try:
         slurm_job_id = os.environ.get('SLURM_JOB_ID', 'default_job_id')
-        torch.save(state, f'model_{slurm_job_id}.pth')
-        #torch.save(auxiliary_state, f'model_{slurm_job_id}.pth')
-
+        torch.save(model.state_dict(), f'model_{slurm_job_id}.pth')
+        torch.save(additional_info, f'model_additional_{slurm_job_id}.pth')
+        state = {
+            'state_dict': model.state_dict(),
+            'additional_info': additional_info
+        }
         wandb.log(state)
     except:
-        torch.save(state, f'model.pth')
-        #torch.save(auxiliary_state, f'model.pth')
+        torch.save(model.state_dict(), f'model.pth')
+        torch.save(additional_info, f'model_additional.pth')
 
 if __name__ == "__main__":
     parser = get_arg_parser()
