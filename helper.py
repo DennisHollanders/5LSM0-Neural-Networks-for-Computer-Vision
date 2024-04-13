@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import cv2
+import random
 from torchvision.transforms import transforms
 from torchvision.transforms import functional as F
 #from scipy.ndimage import
@@ -142,7 +143,7 @@ def calculate_distance_transform(edge_detected_image, num_levels_below_30_percen
     inverted_distance_transform = 1 - normalized_distance_transform
 
     distance_transform = (inverted_distance_transform * 255).astype(np.uint8)
-    Quantization = True
+    Quantization = False
     if Quantization:
         threshold_30_percent = 0.2 * max_distance
         normalized_distance_transform = distance_transform / max_distance * 255
@@ -199,3 +200,25 @@ def calculate_accuracy_near_edges(distance_transform_map, predicted_labels, grou
     accuracy = correct_predictions / len(predicted_near_edges) if len(predicted_near_edges) > 0 else 0
 
     return accuracy
+
+class RandomFog:
+    def __call__(self, img):
+        if random.random() < 0.2:
+            return F.adjust_gamma(img, gamma=random.uniform(0.5, 1), gain=0.5)
+        return img
+
+class RandomBrightness:
+    def __init__(self, brightness_factor=(0.5, 2.0)):
+        self.brightness_factor = brightness_factor
+
+    def __call__(self, img):
+        brightness_factor = random.uniform(*self.brightness_factor)
+        return F.adjust_brightness(img, brightness_factor)
+
+class RandomContrast:
+    def __init__(self, contrast_factor=(0.5, 2.0)):
+        self.contrast_factor = contrast_factor
+
+    def __call__(self, img):
+        contrast_factor = random.uniform(*self.contrast_factor)
+        return F.adjust_contrast(img, contrast_factor)

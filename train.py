@@ -78,6 +78,9 @@ def main(args):
     """define your model, trainingsloop optimitzer etc. here"""
     transform = transforms.Compose([
         transforms.Resize(args.resize),
+        RandomFog(),
+        RandomBrightness(brightness_factor=(0.5, 1.5)),
+        RandomContrast(contrast_factor=(0.5, 1.5)),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
