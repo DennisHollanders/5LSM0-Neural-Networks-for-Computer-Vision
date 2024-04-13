@@ -12,7 +12,7 @@ try:
 except ImportError:
     pass
 
-model_path = 'models/DiceLoss.pth'
+model_path = 'models/Dice_5871431.pth'
 
 def plot_losses(epoch_data):
     train_losses = epoch_data['loss']
@@ -31,23 +31,33 @@ def main():
 
     model = Model()
     state = torch.load(model_path, map_location=device)
-    model.load_state_dict(state["model_state_dict"])
+    model.load_state_dict(state)
+    # state = torch.load(model_path, map_location=device)
+    # model.load_state_dict(state)
     model.to(device)
 
-    # Print model summary to check parameter sizes and types
-    print("Model Summary:")
-    for name, param in model.named_parameters():
-        print(f"{name}: {param.size()}, dtype={param.dtype}")
-
-    # Check if any additional items are saved in the state that are not needed
-    print("\nItems in saved state:")
-    for key in state.keys():
-        print(f"{key}: type({type(state[key])})")
-
-    # Extract and plot the training and validation losses
-    epoch_data = state['epoch_data']
-    loss_criterion = state['loss criterion']
-    print(epoch_data,loss_criterion)
+    # # Print model summary to check parameter sizes and types
+    # print("Model Summary:")
+    # for name, param in model.named_parameters():
+    #     print(f"{name}: {param.size()}, dtype={param.dtype}")
+    #
+    # # Check if any additional items are saved in the state that are not needed
+    # print("\nItems in saved state:")
+    # for key in state.keys():
+    #     print(f"{key}: type({type(state[key])})")
+    #
+    # # Extract and plot the training and validation losses if available
+    # if 'epoch_data' in state['additional_info']:
+    #     epoch_data = state['additional_info']['epoch_data']
+    #     plot_losses(epoch_data)
+    #
+    # # Assuming loss criterion details are required for initialization or information
+    # if 'loss_criterion_state_dict' in state['additional_info']:
+    #     # Initialize your loss criterion here if needed
+    #     loss_criterion = nn.YourLossClass()  # replace 'YourLossClass' with your actual class
+    #     loss_criterion.load_state_dict(state['additional_info']['loss_criterion_state_dict'])
+    #     print("\nLoaded Loss Criterion State.")
+    #print(epoch_data,loss_criterion)
     #plot_losses(epoch_data)
 
     # Prepare the dataset and DataLoader

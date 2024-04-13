@@ -179,7 +179,7 @@ def main(args):
     try:
         slurm_job_id = os.environ.get('SLURM_JOB_ID', 'default_job_id')
         torch.save(model.state_dict(), f'model_{slurm_job_id}.pth')
-        torch.save(additional_info, f'model_additional_{slurm_job_id}.pth')
+        torch.save(additional_info, f'addinfo_model_{slurm_job_id}.pth')
         state = {
             'state_dict': model.state_dict(),
             'additional_info': additional_info
@@ -187,7 +187,7 @@ def main(args):
         wandb.log(state)
     except:
         torch.save(model.state_dict(), f'model.pth')
-        torch.save(additional_info, f'model_additional.pth')
+        torch.save(additional_info, f'addinfo_model.pth')
 
 if __name__ == "__main__":
     parser = get_arg_parser()
