@@ -74,7 +74,7 @@ def main(args):
                 "Image size": args.resize,
                 'num_epochs': args.num_epochs,
                 'Applied loss': args.loss,
-                'Weights applied': args.distance_transform_weight,
+                'Weights applied': args.weight_applied,
                 'Validation size': args.val_size,
             }
         )
