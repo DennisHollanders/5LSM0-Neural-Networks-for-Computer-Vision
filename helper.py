@@ -57,14 +57,14 @@ class Loss_Functions(nn.Module):
         if target.shape[1] > 1:
             target_segmentation = target[:,0,:,:]
             distance_transform_map = (target[:,1,:,:].reshape(-1) /255 )+self.epsilon
-            print('min max distance transform:', min(distance_transform_map), max(distance_transform_map))
+            #print('min max distance transform:', min(distance_transform_map), max(distance_transform_map))
         else:
             raise ValueError("Segmentation targets only have a single channel, add distance transform and edge map")
         C = pred.shape[1]
         total_loss = 0.0
         for c in range(C):
             if c != self.ignore_index:
-                    print('classes',c)
+                    #print('classes',c)
                     pred_flat = pred[:, c].contiguous().reshape(-1)
                     target_flat = (target_segmentation == c).float().reshape(-1)
                     if self.weight == 'both':
