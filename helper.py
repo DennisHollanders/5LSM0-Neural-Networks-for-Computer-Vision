@@ -34,27 +34,14 @@ class Loss_Functions(nn.Module):
                 self.class_imbalance_weights[cls] = 1
 
     def dice_loss(self, pred_flat, target_flat, weight_applied_flat):
-        """
-        intersection = (pred_flat * target_flat).sum()
-        dice_coef = (2. * intersection + self.smooth) / (pred_flat.sum() + target_flat.sum() + self.smooth)
-        return 1 - dice_coef
-        """
         # Weighting the intersection and the sums with the distance transform map
         weighted_intersection = (pred_flat * target_flat * weight_applied_flat).sum()
         weighted_pred_sum = (pred_flat * weight_applied_flat).sum()
         weighted_target_sum = (target_flat * weight_applied_flat).sum()
-
         dice_coef = (2. * weighted_intersection + self.smooth) / (weighted_pred_sum + weighted_target_sum + self.smooth)
         return 1 - dice_coef
 
     def jaccard_loss(self, pred_flat, target_flat,weight_applied_flat):
-        """
-        intersection = (pred_flat * target_flat).sum()
-        union = pred_flat.sum() + target_flat.sum() - intersection
-        jaccard_coef = (intersection + self.smooth) / (union + self.smooth)
-        return 1 - jaccard_coef
-        """
-
         #print(pred_flat.shape,target_flat.shape,distance_transform_map.shape)
         # Applying weights to intersection and union calculations
         weighted_intersection = (pred_flat * target_flat * weight_applied_flat).sum()
@@ -66,26 +53,38 @@ class Loss_Functions(nn.Module):
         # if self.weight is not None:
         #     self.weight = self.weight.to(pred.device)
         #print('target shape in loss function',target.shape)
+        print(self.weight)
         if target.shape[1] > 1:
             target_segmentation = target[:,0,:,:]
-            distance_transform_map = target[:,1,:,:]
-            #inverted_distance_transform_map = 1.0 / (distance_transform_map + self.epsilon)
-        weight_applied = distance_transform_map + self.class_imbalance_weights /2
+            distance_transform_map = (target[:,1,:,:].reshape(-1) /255 )+self.epsilon
+            print('min max distance transform:', min(distance_transform_map), max(distance_transform_map))
+        else:
+            raise ValueError("Segmentation targets only have a single channel, add distance transform and edge map")
         C = pred.shape[1]
         total_loss = 0.0
         for c in range(C):
             if c != self.ignore_index:
-                pred_flat = pred[:, c].contiguous().reshape(-1) # or apply view
-                target_flat = (target_segmentation == c).float().reshape(-1)
-                weight_applied_flat = weight_applied.reshape(-1)
-
-                if self.loss_type == 'Dice':
-                    loss = self.dice_loss(pred_flat, target_flat,weight_applied_flat)
-                elif self.loss_type == 'Jaccard':
-                    loss = self.jaccard_loss(pred_flat, target_flat,weight_applied_flat)
-                else:
-                    raise ValueError("Unsupported loss type. Use 'dice' or 'jaccard'.")
-                total_loss += loss
+                    print('classes',c)
+                    pred_flat = pred[:, c].contiguous().reshape(-1)
+                    target_flat = (target_segmentation == c).float().reshape(-1)
+                    if self.weight == 'both':
+                        weight_applied_flat = (distance_transform_map + self.class_imbalance_weights[c]) / 2
+                    elif self.weight == 'imb':
+                        weight_applied_flat = torch.ones_like(distance_transform_map) * self.class_imbalance_weights[c]
+                    elif self.weight == 'dist':
+                        weight_applied_flat = distance_transform_map
+                    elif self.weight == 'none':
+                        weight_applied_flat = torch.ones_like(distance_transform_map)
+                    else:
+                        raise ValueError("self.weight should be one of: 'both', 'imb', 'dist' or 'none'")
+                    print(weight_applied_flat)
+                    if self.loss_type == 'Dice':
+                        loss = self.dice_loss(pred_flat, target_flat,weight_applied_flat)
+                    elif self.loss_type == 'Jaccard':
+                        loss = self.jaccard_loss(pred_flat, target_flat,weight_applied_flat)
+                    else:
+                        raise ValueError("Unsupported loss type. Use 'dice' or 'jaccard'.")
+                    total_loss += loss
         return total_loss / C
 
 def print_gradients(model):

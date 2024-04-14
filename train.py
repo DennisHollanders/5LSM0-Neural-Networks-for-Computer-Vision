@@ -22,20 +22,23 @@ except ImportError:
     pass
 
 def get_arg_parser():
-    parser = ArgumentParser()
+    #Tuneable hyperparams
     loss = 'Jaccard'
-    distance_transform_weight = True
+    weight_applied = 'imb'
     learning_rate = 5e-5
     val_size = 0.2
     num_classes = 19
 
+    parser = ArgumentParser()
     # Detect the running environment
+    # Used for actual
     if 'SLURM_JOB_ID' in os.environ:
         default_data_path = "/gpfs/work5/0/jhstue005/JHS_data/CityScapes"
         default_batch_size = 16
         default_num_epochs = 20
         default_resize = (256, 512)
         default_pin_memory = True
+    # Used for local debugging
     else:
         default_data_path = "City_Scapes/"
         default_batch_size = 4
@@ -48,11 +51,11 @@ def get_arg_parser():
     parser.add_argument("--num_epochs", type=int, default=default_num_epochs, help="Number of epochs for training")
     parser.add_argument("--resize", type=tuple, default=default_resize, help="Image format that is being worked with ")
     parser.add_argument("--loss", type=str, default= loss, help="Loss function applied to the model")
-    parser.add_argument("--distance_transform_weight", type=bool, default=distance_transform_weight, help="Adds boundary information to loss function")
+    parser.add_argument("--weight_applied", type=str, default=weight_applied, help="Information which weights to add to loss function")
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Stepsize of the optimizer")
     parser.add_argument("--val_size", type=float, default=val_size, help="Size of validation set, size trainset = 1- val_size")
     parser.add_argument("--num_classes", type=int, default=num_classes, help="Number of classes to be predicted")
-    parser.add_argument("--pin_memory",type=bool,default=default_pin_memory,help="variable to smoothen transfer to gpu")
+    parser.add_argument("--pin_memory",type=bool,default=default_pin_memory,help="Variable to smoothen transfer to gpu")
     return parser
 
 def main(args):
@@ -107,7 +110,7 @@ def main(args):
     model = Model()
     model.to(device)
     initialize_weights(model)
-    criterion = Loss_Functions(args.num_classes,args.loss,args.distance_transform_weight,ignore_index=255)
+    criterion = Loss_Functions(args.num_classes,args.loss,args.weight_applied,ignore_index=255)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
 
     epoch_data = collections.defaultdict(list)
@@ -229,42 +232,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args,parser)
     main(args)
-
-
-"""
-# Initialize accumulators
-    train_correct_counts = collections.defaultdict(int)
-    train_total_counts = collections.defaultdict(int)
-    val_correct_counts = collections.defaultdict(int)
-    val_total_counts = collections.defaultdict(int)
-
-    # Rest of the setup code...
-
-    for epoch in range(args.num_epochs):
-        model.train()
-        for inputs, labels in train_loader:
-            # Training step...
-            preds = torch.argmax(outputs, dim=1)
-            for cls in range(args.num_classes):
-                train_correct_counts[cls] += ((preds == cls) & (ground_truth_labels == cls)).sum().item()
-                train_total_counts[cls] += (ground_truth_labels == cls).sum().item()
-
-        # After all training batches
-        train_class_accuracies = calculate_class_accuracy(train_correct_counts, train_total_counts)
-
-        model.eval()
-        with torch.no_grad():
-            for inputs, labels in val_loader:
-                # Validation step...
-                preds = torch.argmax(outputs, dim=1)
-                for cls in range(args.num_classes):
-                    val_correct_counts[cls] += ((preds == cls) & (ground_truth_labels == cls)).sum().item()
-                    val_total_counts[cls] += (ground_truth_labels == cls).sum().item()
-
-        # After all validation batches
-        val_class_accuracies = calculate_class_accuracy(val_correct_counts, val_total_counts)
-        criterion.update_class_weights(val_class_accuracies)  # Update weights based on validation accuracies
-
-        # Logging and saving...
-"""
-
