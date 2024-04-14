@@ -53,7 +53,7 @@ class Loss_Functions(nn.Module):
         # if self.weight is not None:
         #     self.weight = self.weight.to(pred.device)
         #print('target shape in loss function',target.shape)
-        print(self.weight)
+        #print(self.weight)
         if target.shape[1] > 1:
             target_segmentation = target[:,0,:,:]
             distance_transform_map = (target[:,1,:,:].reshape(-1) /255 )+self.epsilon
@@ -77,7 +77,7 @@ class Loss_Functions(nn.Module):
                         weight_applied_flat = torch.ones_like(distance_transform_map)
                     else:
                         raise ValueError("self.weight should be one of: 'both', 'imb', 'dist' or 'none'")
-                    print(weight_applied_flat)
+                    #print(weight_applied_flat)
                     if self.loss_type == 'Dice':
                         loss = self.dice_loss(pred_flat, target_flat,weight_applied_flat)
                     elif self.loss_type == 'Jaccard':
