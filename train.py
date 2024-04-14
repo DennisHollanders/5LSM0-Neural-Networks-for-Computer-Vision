@@ -16,6 +16,8 @@ import wandb
 from torch.utils.data import random_split
 from torchvision.transforms import Lambda
 import torch.nn as nn
+from torch.optim.lr_scheduler import ExponentialLR
+
 try:
     import pretty_errors
 except ImportError:
@@ -111,7 +113,8 @@ def main(args):
     model.to(device)
     initialize_weights(model)
     criterion = Loss_Functions(args.num_classes,args.loss,args.weight_applied,ignore_index=255)
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate,  betas=(0.95, 0.999), eps=1e-08, weight_decay=1e-4)
+    scheduler = ExponentialLR(optimizer, gamma=0.95)
 
     epoch_data = collections.defaultdict(list)
 
@@ -204,10 +207,14 @@ def main(args):
             cls: (val_correct_counts[cls] / val_total_counts[cls] * 100 if val_total_counts[cls] > 0 else 0) for
             cls in range(args.num_classes)}
         val_class_accuracies = {key: round(value, 2) for key, value in val_class_accuracies.items()}
+        scheduler.step()
 
         # Print class-specific training accuracies
         print(f'Validation Class Accuracies: {val_class_accuracies}')
         print(f'New class imbalance weights: {criterion.class_imbalance_weights}')
+
+        current_lr = optimizer.param_groups[0]['lr']
+        print(f"Current Learning Rate: {current_lr} \n")
 
     additional_info = {
         'optimizer_state_dict': optimizer.state_dict(),

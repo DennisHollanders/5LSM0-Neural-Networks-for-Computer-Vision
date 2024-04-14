@@ -25,13 +25,19 @@ class Loss_Functions(nn.Module):
         self.epsilon = 1e-4
         self.class_imbalance_weights = torch.ones(num_classes)
 
-    def update_class_weights(self, accuracy_dict):
+    def update_class_weights(self, accuracy_dict, smoothing_factor =0.1):
         # Update weights inversely proportional to the correctly classified percentages
         for cls, acc in accuracy_dict.items():
             if acc > 0:
-                self.class_imbalance_weights[cls] = 1 - (acc/100)
+                new_weight = 1 - (acc / 100)
             else:
-                self.class_imbalance_weights[cls] = 1
+                new_weight = 1
+            # Exponential moving average update
+            self.class_imbalance_weights[cls] = (1 - smoothing_factor) * self.class_imbalance_weights[cls] + smoothing_factor * new_weight
+
+            # Normalizing weights to prevent scaling issues
+            total_weight = self.class_imbalance_weights.sum()
+            self.class_imbalance_weights /= total_weight
 
     def dice_loss(self, pred_flat, target_flat, weight_applied_flat):
         # Weighting the intersection and the sums with the distance transform map
