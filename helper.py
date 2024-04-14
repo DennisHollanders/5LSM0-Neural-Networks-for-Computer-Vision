@@ -29,7 +29,7 @@ class Loss_Functions(nn.Module):
         # Update weights inversely proportional to the correctly classified percentages
         for cls, acc in accuracy_dict.items():
             if acc > 0:
-                self.class_imbalance_weights[cls] = 1 / (acc/100)
+                self.class_imbalance_weights[cls] = 1 - (acc/100)
             else:
                 self.class_imbalance_weights[cls] = 1
 

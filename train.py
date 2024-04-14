@@ -207,6 +207,7 @@ def main(args):
 
         # Print class-specific training accuracies
         print(f'Validation Class Accuracies: {val_class_accuracies}')
+        print(f'New class imbalance weights: {criterion.class_imbalance_weights}')
 
     additional_info = {
         'optimizer_state_dict': optimizer.state_dict(),
