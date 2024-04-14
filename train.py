@@ -39,7 +39,7 @@ def get_arg_parser():
     else:
         default_data_path = "City_Scapes/"
         default_batch_size = 4
-        default_num_epochs = 1
+        default_num_epochs = 2
         default_resize = (32, 32)
         default_pin_memory = False
 
@@ -84,7 +84,7 @@ def main(args):
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
-    
+
     target_transform = transforms.Compose([
         transforms.Resize(args.resize, interpolation=transforms.InterpolationMode.NEAREST),
         transforms.ToTensor(),
@@ -111,6 +111,12 @@ def main(args):
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, betas=(0.9, 0.999), eps=1e-08, weight_decay=1e-4)
 
     epoch_data = collections.defaultdict(list)
+
+    train_correct_counts = collections.defaultdict(int)
+    train_total_counts = collections.defaultdict(int)
+    val_correct_counts = collections.defaultdict(int)
+    val_total_counts = collections.defaultdict(int)
+
     # training/validation loop
     for epoch in range(args.num_epochs):
         running_loss = 0.0
@@ -133,18 +139,31 @@ def main(args):
             # comparison
             preds = torch.argmax(outputs, dim=1)
             #print(preds.shape,outputs.shape)
-            iou_sum += calculate_iou(preds, ground_truth_labels, num_classes=args.num_classes)
-            edge_accuracy_sum += calculate_accuracy_near_edges(distance_transform_map, preds, ground_truth_labels, threshold=10)
-        print_gradients(model)
+            for cls in range(args.num_classes):
+                train_correct_counts[cls] += ((preds == cls) & (ground_truth_labels == cls)).sum().item()
+                train_total_counts[cls] += (ground_truth_labels == cls).sum().item()
+
+            #iou_sum += calculate_iou(preds, ground_truth_labels, num_classes=args.num_classes)
+            #edge_accuracy_sum += calculate_accuracy_near_edges(distance_transform_map, preds, ground_truth_labels, threshold=10)
+        #print_gradients(model)
         epoch_loss = running_loss / len(train_loader)
-        epoch_edge = edge_accuracy_sum / len(train_loader)
-        epoch_iou = iou_sum / len(train_loader)
+        #epoch_edge = edge_accuracy_sum / len(train_loader)
+        #epoch_iou = iou_sum / len(train_loader)
         # epoch_edge_accuracy = edge_accuracy_sum / num_batches
         print(f'Epoch {epoch + 1}/{args.num_epochs}, Loss: {epoch_loss:.4f}')
-        print(f"edge: {epoch_edge:.4f}, iou: {epoch_iou:.4f} ")
+        print('train total count:',train_total_counts,'train correct count',train_correct_counts)
+        #print(f"edge: {epoch_edge:.4f}, iou: {epoch_iou:.4f} ")
         epoch_data['loss'].append(epoch_loss)
-        epoch_data['edge'].append(epoch_edge)
-        epoch_data['iou'].append(epoch_iou)
+        train_class_accuracies = {
+            cls: (train_correct_counts[cls] / train_total_counts[cls] * 100 if train_total_counts[cls] > 0 else 0) for
+            cls in range(args.num_classes)}
+        train_class_accuracies = {key: round(value,2) for key,value in train_class_accuracies.items()}
+
+        # Print class-specific training accuracies
+        print(f'Train Class Accuracies: {train_class_accuracies}')
+
+        #epoch_data['edge'].append(epoch_edge)
+        #epoch_data['iou'].append(epoch_iou)
 
         model.eval()
         running_loss = 0.0
@@ -161,17 +180,30 @@ def main(args):
             distance_transform_map, ground_truth_labels = labels[:, 2, :, :], labels[:, 0, :, :]
             # comparison
             preds = torch.argmax(outputs, dim=1)
-            iou_sum += calculate_iou(preds, ground_truth_labels, num_classes=args.num_classes)
-            edge_accuracy_sum += calculate_accuracy_near_edges(distance_transform_map, preds, ground_truth_labels,threshold=10)
+            #iou_sum += calculate_iou(preds, ground_truth_labels, num_classes=args.num_classes)
+            #edge_accuracy_sum += calculate_accuracy_near_edges(distance_transform_map, preds, ground_truth_labels,threshold=10)
+            for cls in range(args.num_classes):
+                val_correct_counts[cls] += ((preds == cls) & (ground_truth_labels == cls)).sum().item()
+                val_total_counts[cls] += (ground_truth_labels == cls).sum().item()
 
-        epoch_edge = edge_accuracy_sum / len(train_loader)
-        epoch_iou = iou_sum / len(train_loader)
+        #epoch_edge = edge_accuracy_sum / len(train_loader)
+        #epoch_iou = iou_sum / len(train_loader)
         validation_loss = running_loss / len(val_loader)
         epoch_data['validation_loss'].append(validation_loss)
-        epoch_data['validation_edge'].append(epoch_edge)
-        epoch_data['validation_iou'].append(epoch_iou)
+        #epoch_data['validation_edge'].append(epoch_edge)
+        #epoch_data['validation_iou'].append(epoch_iou)
         print( f"Epoch [{epoch + 1}/{args.num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
-        print( f"Validation edge: {epoch_edge:.4f}, Validation iou: {epoch_iou:.4f} \n")
+        #print( f"Validation edge: {epoch_edge:.4f}, Validation iou: {epoch_iou:.4f} \n")
+        val_class_accuracies = calculate_iou(preds, ground_truth_labels, args.num_classes)
+        criterion.update_class_weights(val_class_accuracies)
+
+        val_class_accuracies = {
+            cls: (val_correct_counts[cls] / val_total_counts[cls] * 100 if val_total_counts[cls] > 0 else 0) for
+            cls in range(args.num_classes)}
+        val_class_accuracies = {key: round(value, 2) for key, value in val_class_accuracies.items()}
+
+        # Print class-specific training accuracies
+        print(f'Validation Class Accuracies: {val_class_accuracies}')
 
     additional_info = {
         'optimizer_state_dict': optimizer.state_dict(),
@@ -195,7 +227,44 @@ def main(args):
 if __name__ == "__main__":
     parser = get_arg_parser()
     args = parser.parse_args()
-    #print(args,parser)
+    print(args,parser)
     main(args)
 
+
+"""
+# Initialize accumulators
+    train_correct_counts = collections.defaultdict(int)
+    train_total_counts = collections.defaultdict(int)
+    val_correct_counts = collections.defaultdict(int)
+    val_total_counts = collections.defaultdict(int)
+
+    # Rest of the setup code...
+
+    for epoch in range(args.num_epochs):
+        model.train()
+        for inputs, labels in train_loader:
+            # Training step...
+            preds = torch.argmax(outputs, dim=1)
+            for cls in range(args.num_classes):
+                train_correct_counts[cls] += ((preds == cls) & (ground_truth_labels == cls)).sum().item()
+                train_total_counts[cls] += (ground_truth_labels == cls).sum().item()
+
+        # After all training batches
+        train_class_accuracies = calculate_class_accuracy(train_correct_counts, train_total_counts)
+
+        model.eval()
+        with torch.no_grad():
+            for inputs, labels in val_loader:
+                # Validation step...
+                preds = torch.argmax(outputs, dim=1)
+                for cls in range(args.num_classes):
+                    val_correct_counts[cls] += ((preds == cls) & (ground_truth_labels == cls)).sum().item()
+                    val_total_counts[cls] += (ground_truth_labels == cls).sum().item()
+
+        # After all validation batches
+        val_class_accuracies = calculate_class_accuracy(val_correct_counts, val_total_counts)
+        criterion.update_class_weights(val_class_accuracies)  # Update weights based on validation accuracies
+
+        # Logging and saving...
+"""
 

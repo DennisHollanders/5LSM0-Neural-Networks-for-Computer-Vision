@@ -23,32 +23,42 @@ class Loss_Functions(nn.Module):
         self.weight = Weight
         self.ignore_index =ignore_index
         self.epsilon = 1e-4
+        self.class_imbalance_weights = torch.ones(num_classes)
 
-    def dice_loss(self, pred_flat, target_flat, distance_transform_map):
+    def update_class_weights(self, accuracy_dict):
+        # Update weights inversely proportional to the correctly classified percentages
+        for cls, acc in accuracy_dict.items():
+            if acc > 0:
+                self.class_imbalance_weights[cls] = 1 / acc
+            else:
+                self.class_imbalance_weights[cls] = 1
+
+    def dice_loss(self, pred_flat, target_flat, weight_applied_flat):
         """
         intersection = (pred_flat * target_flat).sum()
         dice_coef = (2. * intersection + self.smooth) / (pred_flat.sum() + target_flat.sum() + self.smooth)
         return 1 - dice_coef
         """
         # Weighting the intersection and the sums with the distance transform map
-        weighted_intersection = (pred_flat * target_flat * distance_transform_map).sum()
-        weighted_pred_sum = (pred_flat * distance_transform_map).sum()
-        weighted_target_sum = (target_flat * distance_transform_map).sum()
+        weighted_intersection = (pred_flat * target_flat * weight_applied_flat).sum()
+        weighted_pred_sum = (pred_flat * weight_applied_flat).sum()
+        weighted_target_sum = (target_flat * weight_applied_flat).sum()
 
         dice_coef = (2. * weighted_intersection + self.smooth) / (weighted_pred_sum + weighted_target_sum + self.smooth)
         return 1 - dice_coef
 
-    def jaccard_loss(self, pred_flat, target_flat,distance_transform_map):
+    def jaccard_loss(self, pred_flat, target_flat,weight_applied_flat):
         """
         intersection = (pred_flat * target_flat).sum()
         union = pred_flat.sum() + target_flat.sum() - intersection
         jaccard_coef = (intersection + self.smooth) / (union + self.smooth)
         return 1 - jaccard_coef
         """
+
         #print(pred_flat.shape,target_flat.shape,distance_transform_map.shape)
         # Applying weights to intersection and union calculations
-        weighted_intersection = (pred_flat * target_flat * distance_transform_map).sum()
-        weighted_union = (pred_flat * distance_transform_map).sum() + (target_flat * distance_transform_map).sum() - weighted_intersection
+        weighted_intersection = (pred_flat * target_flat * weight_applied_flat).sum()
+        weighted_union = (pred_flat * weight_applied_flat).sum() + (target_flat * weight_applied_flat).sum() - weighted_intersection
         jaccard_coef = (weighted_intersection + self.smooth) / (weighted_union + self.smooth)
         return 1 - jaccard_coef
 
@@ -59,20 +69,20 @@ class Loss_Functions(nn.Module):
         if target.shape[1] > 1:
             target_segmentation = target[:,0,:,:]
             distance_transform_map = target[:,1,:,:]
-
-            inverted_distance_transform_map = 1.0 / (distance_transform_map + self.epsilon)
+            #inverted_distance_transform_map = 1.0 / (distance_transform_map + self.epsilon)
+        weight_applied = distance_transform_map + self.class_imbalance_weights /2
         C = pred.shape[1]
         total_loss = 0.0
         for c in range(C):
             if c != self.ignore_index:
                 pred_flat = pred[:, c].contiguous().reshape(-1) # or apply view
                 target_flat = (target_segmentation == c).float().reshape(-1)
-                inverted_distance_transform_map_flat = inverted_distance_transform_map.reshape(-1)
+                weight_applied_flat = weight_applied.reshape(-1)
 
                 if self.loss_type == 'Dice':
-                    loss = self.dice_loss(pred_flat, target_flat,inverted_distance_transform_map_flat)
+                    loss = self.dice_loss(pred_flat, target_flat,weight_applied_flat)
                 elif self.loss_type == 'Jaccard':
-                    loss = self.jaccard_loss(pred_flat, target_flat,inverted_distance_transform_map_flat)
+                    loss = self.jaccard_loss(pred_flat, target_flat,weight_applied_flat)
                 else:
                     raise ValueError("Unsupported loss type. Use 'dice' or 'jaccard'.")
                 total_loss += loss
@@ -165,9 +175,11 @@ def calculate_distance_transform(edge_detected_image, num_levels_below_30_percen
 
 def calculate_iou(preds, labels, num_classes):
     ious = []
+    correct_percentages = {}
     preds = preds.reshape(-1)
     labels = labels.reshape(-1)
     #print('in iou',preds.shape, labels.shape)
+    """
     for cls in range(num_classes):
         pred_inds = preds == cls
         target_inds = labels == cls
@@ -176,14 +188,28 @@ def calculate_iou(preds, labels, num_classes):
         union = (pred_inds | target_inds).sum().item()
 
         if union == 0:
-            # Ignore this class if there are no ground truth or predictions (prevents divide by zero)
             continue
 
         iou = float(intersection) / float(max(union, 1))
         ious.append(iou)
 
-    mean_iou = sum(ious) / len(ious) if ious else 1.0  # return 1.0 if all classes are ignored
+    mean_iou = sum(ious) / len(ious) if ious else 1.0
     return mean_iou
+    """
+    for cls in range(num_classes):
+        pred_inds = preds == cls
+        target_inds = labels == cls
+        correct = (pred_inds & target_inds).sum().item()
+        total = target_inds.sum().item()
+
+        if total == 0:
+            correct_percentages[cls] = 0
+        else:
+            correct_percentages[cls] = correct / total * 100
+
+    return correct_percentages
+
+
 
 def calculate_accuracy_near_edges(distance_transform_map, predicted_labels, ground_truth_labels, threshold=10):
     # Identify pixels within the specified distance from the nearest edge

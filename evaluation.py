@@ -13,6 +13,7 @@ except ImportError:
     pass
 
 model_path = 'models/Dice_5871431.pth'
+model_additional = 'models/model_additional_5869017.pth'
 
 def plot_losses(epoch_data):
     train_losses = epoch_data['loss']
@@ -31,8 +32,11 @@ def main():
 
     model = Model()
     state = torch.load(model_path, map_location=device)
+    additonal_info = torch.load(model_additional, map_location=device)
     model.load_state_dict(state)
     # state = torch.load(model_path, map_location=device)
+    # model.load_state_dict(state)
+    state = torch.load(model_path, map_location=device)
     # model.load_state_dict(state)
     model.to(device)
 
@@ -58,7 +62,7 @@ def main():
     #     loss_criterion.load_state_dict(state['additional_info']['loss_criterion_state_dict'])
     #     print("\nLoaded Loss Criterion State.")
     #print(epoch_data,loss_criterion)
-    #plot_losses(epoch_data)
+    plot_losses(epoch_data)
 
     # Prepare the dataset and DataLoader
     transform = transforms.Compose([
