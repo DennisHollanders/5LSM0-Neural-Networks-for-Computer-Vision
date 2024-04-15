@@ -23,8 +23,11 @@ class Loss_Functions(nn.Module):
         self.weight = Weight
         self.ignore_index =ignore_index
         self.epsilon = 1e-4
-        self.class_imbalance_weights = torch.ones(num_classes)
-
+        #self.class_imbalance_weights = torch.ones(num_classes)
+        self.class_imbalance_weights = torch.tensor([0.2, 0.2,0.2,1,1,1,1,1,0.2,0.2,0.2,1,1,0.2,1,1,1,1,1])
+        #self.balance_weight = balance_weight  # Balance between 'imb' and 'dist' weights
+        #self.ce_weight = ce_weight  # Weight for the CE loss in the combined loss function
+        #self.dice_jaccard_weight = 1.0 - ce_weight  # Remaining weight for the Dice/Jaccard loss
     def update_class_weights(self, accuracy_dict, smoothing_factor =0.1):
         # Update weights inversely proportional to the correctly classified percentages
         for cls, acc in accuracy_dict.items():
@@ -68,12 +71,15 @@ class Loss_Functions(nn.Module):
             raise ValueError("Segmentation targets only have a single channel, add distance transform and edge map")
         C = pred.shape[1]
         total_loss = 0.0
+        ce_loss = torch.nn.functional.cross_entropy(pred, target_segmentation, weight=self.class_imbalance_weights,
+                                  ignore_index=self.ignore_index, reduction='none')
+        ce_loss = ce_loss.mean()
         for c in range(C):
             if c != self.ignore_index:
                     #print('classes',c)
                     pred_flat = pred[:, c].contiguous().reshape(-1)
                     target_flat = (target_segmentation == c).float().reshape(-1)
-                    if self.weight == 'both':
+                    """"if self.weight == 'both':
                         weight_applied_flat = (distance_transform_map + self.class_imbalance_weights[c]) / 2
                     elif self.weight == 'imb':
                         weight_applied_flat = torch.ones_like(distance_transform_map) * self.class_imbalance_weights[c]
@@ -84,6 +90,16 @@ class Loss_Functions(nn.Module):
                     else:
                         raise ValueError("self.weight should be one of: 'both', 'imb', 'dist' or 'none'")
                     #print(weight_applied_flat)
+                    """
+                    if 0 <= self.balance_weight <= 1:
+                        # If balance_weight is between 0 and 1, calculate a blend of the weights
+                        imb_weight = self.class_imbalance_weights[c] * self.balance_weight
+                        dist_weight = distance_transform_map * (1 - self.balance_weight)
+                        weight_applied_flat = imb_weight + dist_weight
+                    else:
+                        # If balance_weight is outside the range of 0 to 1, use uniform weights
+                        weight_applied_flat = torch.ones_like(distance_transform_map)
+
                     if self.loss_type == 'Dice':
                         loss = self.dice_loss(pred_flat, target_flat,weight_applied_flat)
                     elif self.loss_type == 'Jaccard':
@@ -91,7 +107,7 @@ class Loss_Functions(nn.Module):
                     else:
                         raise ValueError("Unsupported loss type. Use 'dice' or 'jaccard'.")
                     total_loss += loss
-        return total_loss / C
+        return( (total_loss / C ) + ce_loss )/2
 
 def print_gradients(model):
     for name, parameter in model.named_parameters():

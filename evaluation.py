@@ -62,7 +62,7 @@ def main():
     #     loss_criterion.load_state_dict(state['additional_info']['loss_criterion_state_dict'])
     #     print("\nLoaded Loss Criterion State.")
     #print(epoch_data,loss_criterion)
-    plot_losses(epoch_data)
+    #plot_losses(epoch_data)
 
     # Prepare the dataset and DataLoader
     transform = transforms.Compose([

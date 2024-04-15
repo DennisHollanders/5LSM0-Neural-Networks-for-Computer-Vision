@@ -36,7 +36,7 @@ def get_arg_parser():
     # Used for actual
     if 'SLURM_JOB_ID' in os.environ:
         default_data_path = "/gpfs/work5/0/jhstue005/JHS_data/CityScapes"
-        default_batch_size = 16
+        default_batch_size = 8
         default_num_epochs = 20
         default_resize = (256, 512)
         default_pin_memory = True
@@ -83,9 +83,11 @@ def main(args):
     """define your model, trainingsloop optimitzer etc. here"""
     transform = transforms.Compose([
         transforms.Resize(args.resize),
-        RandomFog(),
-        RandomBrightness(brightness_factor=(0.5, 1.5)),
-        RandomContrast(contrast_factor=(0.5, 1.5)),
+        #RandomFog(),
+        #RandomBrightness(brightness_factor=(0.5, 1.5)),
+        #RandomContrast(contrast_factor=(0.5, 1.5)),
+        transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
+        transforms.RandomAffine(degrees=(-10, 10), translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 10)),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
@@ -102,11 +104,13 @@ def main(args):
     total_size = len(full_training_data)
     train_size = int(total_size * (1- args.val_size))
     val_size = total_size - train_size
+
+    # evaluate random split with class imbalance situations !
     training_data, validation_data = random_split(full_training_data, [train_size, val_size])
 
     # Create DataLoaders for training and validation sets
     train_loader = DataLoader(training_data, batch_size=args.batch_size, shuffle=True, num_workers=8, pin_memory= args.pin_memory)
-    val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=False, num_workers=8, pin_memory=args.pin_memory)
+    val_loader = DataLoader(validation_data, batch_size=args.batch_size, shuffle=True, num_workers=8, pin_memory=args.pin_memory)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = Model()
