@@ -26,7 +26,7 @@ except ImportError:
 def get_arg_parser():
     #Tuneable hyperparams
     loss = 'Jaccard'
-    weight_applied = 'imb'
+    weight_applied = 'both'
     learning_rate = 5e-5
     val_size = 0.2
     num_classes = 19
@@ -118,7 +118,7 @@ def main(args):
     initialize_weights(model)
     criterion = Loss_Functions(args.num_classes,args.loss,args.weight_applied,ignore_index=255)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate,  betas=(0.95, 0.999), eps=1e-08, weight_decay=1e-4)
-    scheduler = ExponentialLR(optimizer, gamma=0.95)
+    scheduler = ExponentialLR(optimizer, gamma=0.90)
 
     epoch_data = collections.defaultdict(list)
 

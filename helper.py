@@ -36,7 +36,7 @@ class Loss_Functions(nn.Module):
             else:
                 new_weight = 1
             # Exponential moving average update
-            self.class_imbalance_weights[cls] = (1 - smoothing_factor) * self.class_imbalance_weights[cls] + smoothing_factor * new_weight
+            #self.class_imbalance_weights[cls] = (1 - smoothing_factor) * self.class_imbalance_weights[cls] + smoothing_factor * new_weight
 
             # Normalizing weights to prevent scaling issues
             total_weight = self.class_imbalance_weights.sum()
