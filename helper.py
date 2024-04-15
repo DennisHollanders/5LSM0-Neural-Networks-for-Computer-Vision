@@ -79,7 +79,7 @@ class Loss_Functions(nn.Module):
                     #print('classes',c)
                     pred_flat = pred[:, c].contiguous().reshape(-1)
                     target_flat = (target_segmentation == c).float().reshape(-1)
-                    """"if self.weight == 'both':
+                    if self.weight == 'both':
                         weight_applied_flat = (distance_transform_map + self.class_imbalance_weights[c]) / 2
                     elif self.weight == 'imb':
                         weight_applied_flat = torch.ones_like(distance_transform_map) * self.class_imbalance_weights[c]
@@ -99,7 +99,7 @@ class Loss_Functions(nn.Module):
                     else:
                         # If balance_weight is outside the range of 0 to 1, use uniform weights
                         weight_applied_flat = torch.ones_like(distance_transform_map)
-
+                    """
                     if self.loss_type == 'Dice':
                         loss = self.dice_loss(pred_flat, target_flat,weight_applied_flat)
                     elif self.loss_type == 'Jaccard':
