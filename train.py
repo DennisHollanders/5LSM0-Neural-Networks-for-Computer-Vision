@@ -26,11 +26,12 @@ except ImportError:
 def get_arg_parser():
     #Tuneable hyperparams
     loss = 'Jaccard'
-    weight_applied = 'both'
+    #weight_applied = 'both'
     learning_rate = 5e-5
     val_size = 0.2
     num_classes = 19
-
+    default_CEbalance = 0.5
+    default_weight_balance = 0.5
     parser = ArgumentParser()
     # Detect the running environment
     # Used for actual
@@ -53,11 +54,13 @@ def get_arg_parser():
     parser.add_argument("--num_epochs", type=int, default=default_num_epochs, help="Number of epochs for training")
     parser.add_argument("--resize", type=tuple, default=default_resize, help="Image format that is being worked with ")
     parser.add_argument("--loss", type=str, default= loss, help="Loss function applied to the model")
-    parser.add_argument("--weight_applied", type=str, default=weight_applied, help="Information which weights to add to loss function")
+    #parser.add_argument("--weight_applied", type=str, default=weight_applied, help="Information which weights to add to loss function")
     parser.add_argument("--learning_rate", type=float, default=learning_rate, help="Stepsize of the optimizer")
     parser.add_argument("--val_size", type=float, default=val_size, help="Size of validation set, size trainset = 1- val_size")
     parser.add_argument("--num_classes", type=int, default=num_classes, help="Number of classes to be predicted")
     parser.add_argument("--pin_memory",type=bool,default=default_pin_memory,help="Variable to smoothen transfer to gpu")
+    parser.add_argument("--CEbalance",type=float, default=default_CEbalance,help="Defines the ratio between CEbalance and jaccard")
+    parser.add_argument("--weight_balance", type=float, default=default_weight_balance,help="Defines the ratio between distransform and class imbalance weights")
     return parser
 
 def main(args):
@@ -76,8 +79,10 @@ def main(args):
                 "Image size": args.resize,
                 'num_epochs': args.num_epochs,
                 'Applied loss': args.loss,
-                'Weights applied': args.weight_applied,
+               # 'Weights applied': args.weight_applied,
                 'Validation size': args.val_size,
+                'Weight balance': args.weight_balance,
+                'Ce balance': args.CEbalance,
             }
         )
     """define your model, trainingsloop optimitzer etc. here"""
@@ -116,7 +121,7 @@ def main(args):
     model = Model()
     model.to(device)
     initialize_weights(model)
-    criterion = Loss_Functions(args.num_classes,args.loss,args.weight_applied,ignore_index=255)
+    criterion = Loss_Functions(args.num_classes,args.loss,0.5, 0.5,ignore_index=255)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate,  betas=(0.95, 0.999), eps=1e-08, weight_decay=1e-4)
     scheduler = ExponentialLR(optimizer, gamma=0.90)
 

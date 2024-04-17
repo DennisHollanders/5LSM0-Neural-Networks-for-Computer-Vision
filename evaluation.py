@@ -12,7 +12,7 @@ try:
 except ImportError:
     pass
 
-model_path = 'models/Dice_5871431.pth'
+model_path = 'models/model_5920006.pth'
 model_additional = 'models/model_additional_5869017.pth'
 
 def plot_losses(epoch_data):
@@ -100,19 +100,22 @@ def visualize_segmentation(model, dataloader, num_examples=5):
     """
     colors, class_names = names_colors_classes()
     model.eval()
-    plt.figure(figsize=(15, 10))
+
     with torch.no_grad():
         for i, (images, masks) in enumerate(dataloader):
             if i >= 1:
                 break
+
             if masks.shape[1] > 1:
                 print('edge mask should be visualized')
-                visualize_edge_masks(masks, num_examples)
-                masks = masks[:,0,:,:]
+                #visualize_edge_masks(masks, num_examples)
 
+            plt.figure(figsize=(15 , 20))
             print('shape =', masks.shape)
+            #masks = (masks[:,0, :, :] * 255).long().squeeze()
+            #masks = utils.map_id_to_train_id(masks) #.unsqueeze(1)
             print('after',masks.shape)
-
+            masks = masks[:, 0, :, :]
 
             # prep tensor to numpy to be plotted
             outputs = model(images)
@@ -128,24 +131,34 @@ def visualize_segmentation(model, dataloader, num_examples=5):
                 mask_rgb = mask_to_rgb(masks[j], colors)
                 pred_mask_rgb = mask_to_rgb(predicted[j], colors)
 
+                # Calculate error mask only for non-ignored pixels
+                error_mask = ((mask_rgb != pred_mask_rgb) & (mask_rgb != 255)).astype(np.uint8) *255
+
                 # Original Image
-                plt.subplot(num_examples, 3, j*3 + 1)
+                plt.subplot(num_examples, 4, j * 4 + 1)
                 plt.imshow(image)
                 plt.title('Image')
                 plt.axis('off')
 
                 # Ground Truth Mask
-                plt.subplot(num_examples, 3, j*3 + 2)
+                plt.subplot(num_examples, 4, j * 4 + 2)
                 plt.imshow(mask_rgb)
                 plt.title('Ground Truth Mask')
                 plt.axis('off')
 
                 # Model's Prediction
-                plt.subplot(num_examples, 3, j*3 + 3)
+                plt.subplot(num_examples, 4, j * 4 + 3)
                 plt.imshow(pred_mask_rgb)
                 plt.title("Model's Prediction")
                 plt.axis('off')
-            plt.subplots_adjust(wspace=0.05, hspace=0.1)
+
+                # Error Mask
+                plt.subplot(num_examples, 4, j * 4 + 4)
+                plt.imshow(error_mask, cmap='binary_r')
+                plt.title("Error Highlight")
+                plt.axis('off')
+
+            plt.subplots_adjust(wspace=0.01, hspace=0.1)
             plt.tight_layout()
             plt.show()
 
@@ -174,12 +187,9 @@ def mask_to_rgb(mask, class_to_color):
     Returns:
         numpy.ndarray: RGB mask where each pixel is represented as an RGB tuple.
     """
-    print('in mask to rgb', mask.shape)
 
     # Ensure mask is 2D
     mask = mask.squeeze()
-    print('in mask to rgb reshaped', mask.shape)
-
     height, width = mask.shape
 
     # Initialize an empty RGB mask
@@ -195,15 +205,12 @@ def mask_to_rgb(mask, class_to_color):
     return rgb_mask
 
 def visualize_edge_masks(masks, num_examples):
-    print('shape masks:::::::', masks.shape)
     plt.figure(figsize=(15, 10))
     masks = masks.numpy()
     for j in range(4):
         #image = renormalize_image(images[j].transpose(1, 2, 0))
         #mask_rgb = mask_to_rgb(masks[j], colors)
         #pred_mask_rgb = mask_to_rgb(predicted[j], colors)
-
-        print(masks[j,0,:,:].shape)
         # Original Image
         plt.subplot(num_examples, 3, j * 3 + 1)
         plt.imshow(masks[j,0,:,:])
