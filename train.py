@@ -25,16 +25,16 @@ except ImportError:
 
 
 # Define the ranges for your hyperparameters
-learning_rates = [1e-3, 5e-4, 1e-4]
-batch_sizes = [8, 16]
-CEbalances = [0.1,0.4, 0.7, 0.9]
-weight_balances =  [0.1,0.4, 0.7, 0.9]
-loss = ['Jaccard', 'Dice']
+learning_rates = [5e-4]
+batch_sizes = [8]
+CEbalances = [0.1,0.5, 0.9]
+weight_balances =  [0.1,0.5, 0.9]
+loss = ['Jaccard','Dice']
 
 # Create a list of all possible combinations of hyperparameters
 hyperparameter_combinations = list(itertools.product(
     learning_rates, batch_sizes, CEbalances, weight_balances, loss))
-print(hyperparameter_combinations.shape)
+print(len(hyperparameter_combinations))
 def get_arg_parser(hparams):
     #Tuneable hyperparams
     learning_rate, default_batch_size, default_CEbalance, default_weight_balance, loss = hparams
