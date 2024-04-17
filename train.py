@@ -17,27 +17,39 @@ from torch.utils.data import random_split
 from torchvision.transforms import Lambda
 import torch.nn as nn
 from torch.optim.lr_scheduler import ExponentialLR
-
+import itertools
 try:
     import pretty_errors
 except ImportError:
     pass
 
-def get_arg_parser():
+
+# Define the ranges for your hyperparameters
+learning_rates = [1e-3, 5e-4, 1e-4]
+batch_sizes = [8, 16]
+CEbalances = [0.1,0.4, 0.7, 0.9]
+weight_balances =  [0.1,0.4, 0.7, 0.9]
+loss = ['Jaccard', 'Dice']
+
+# Create a list of all possible combinations of hyperparameters
+hyperparameter_combinations = list(itertools.product(
+    learning_rates, batch_sizes, CEbalances, weight_balances, loss))
+print(hyperparameter_combinations.shape)
+def get_arg_parser(hparams):
     #Tuneable hyperparams
-    loss = 'Jaccard'
-    #weight_applied = 'both'
-    learning_rate = 5e-5
+    learning_rate, default_batch_size, default_CEbalance, default_weight_balance, loss = hparams
+    #loss =  hyperparameters.
+    #learning_rate = hyperparameters.
+    #default_CEbalance = hyperparameters.
+    #default_weight_balance = hyperparameters
     val_size = 0.2
     num_classes = 19
-    default_CEbalance = 0.5
-    default_weight_balance = 0.5
     parser = ArgumentParser()
     # Detect the running environment
     # Used for actual
     if 'SLURM_JOB_ID' in os.environ:
         default_data_path = "/gpfs/work5/0/jhstue005/JHS_data/CityScapes"
-        default_batch_size = 8
+        #default_batch_size = hyperparameters.
         default_num_epochs = 20
         default_resize = (256, 512)
         default_pin_memory = True
@@ -123,7 +135,7 @@ def main(args):
     initialize_weights(model)
     criterion = Loss_Functions(args.num_classes,args.loss,0.5, 0.5,ignore_index=255)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate,  betas=(0.95, 0.999), eps=1e-08, weight_decay=1e-4)
-    scheduler = ExponentialLR(optimizer, gamma=0.90)
+    scheduler = ExponentialLR(optimizer, gamma=0.95)
 
     epoch_data = collections.defaultdict(list)
 
@@ -245,7 +257,8 @@ def main(args):
         torch.save(additional_info, f'addinfo_model.pth')
 
 if __name__ == "__main__":
-    parser = get_arg_parser()
-    args = parser.parse_args()
-    print(args,parser)
-    main(args)
+    for hparams in hyperparameter_combinations:
+        parser = get_arg_parser(hparams)
+        args = parser.parse_args()
+        print(args,parser)
+        main(args)

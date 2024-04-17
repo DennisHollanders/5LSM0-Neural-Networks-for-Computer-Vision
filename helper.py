@@ -80,7 +80,8 @@ class Loss_Functions(nn.Module):
             raise ValueError("Segmentation targets only have a single channel, add distance transform and edge map")
         C = pred.shape[1]
         total_loss = 0.0
-        ce_loss = torch.nn.functional.cross_entropy(pred, target_segmentation, weight=self.class_imbalance_weights,
+        #self.class_imbalance_weights= self.class_imbalance_weights.to(device)
+        ce_loss = torch.nn.functional.cross_entropy(pred, target_segmentation, #weight=self.class_imbalance_weights,
                                   ignore_index=self.ignore_index, reduction='none')
         ce_loss = ce_loss.mean()
         for c in range(C):
@@ -103,10 +104,7 @@ class Loss_Functions(nn.Module):
                     else:
                         raise ValueError("Unsupported loss type. Use 'dice' or 'jaccard'.")
                     total_loss += loss
-        print('dice',self.dice_jaccard_weight * (total_loss/C))
-        print('ce',ce_loss * self.ce_weight)
-        combined_loss = ((self.dice_jaccard_weight * (total_loss/C) )+ (ce_loss * self.ce_weight)) / 2
-        print('combined',combined_loss)
+        combined_loss = ((self.dice_jaccard_weight * (total_loss/(C-1)) )+ (ce_loss * self.ce_weight)) / 2
         return combined_loss
 
 def print_gradients(model):
