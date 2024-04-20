@@ -42,7 +42,7 @@ class Loss_Functions(nn.Module):
             #self.class_imbalance_weights /= total_weight
     """
 
-    def update_class_weights(self, accuracy_dict, smoothing_factor=0.1):
+    def update_class_weights(self, accuracy_dict, smoothing_factor):
         # Constants for the quadratic gamma function
         a = 1 / 2500
         b = -2 / 25

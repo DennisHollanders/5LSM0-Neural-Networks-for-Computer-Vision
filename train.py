@@ -224,7 +224,7 @@ def main(args):
         print( f"Epoch [{epoch + 1}/{args.num_epochs}], Train Loss: {epoch_loss:.4f}, Validation Loss: {validation_loss:.4f}")
         #print( f"Validation edge: {epoch_edge:.4f}, Validation iou: {epoch_iou:.4f} \n")
         val_class_accuracies = calculate_iou(preds, ground_truth_labels, args.num_classes)
-        criterion.update_class_weights(val_class_accuracies)
+        criterion.update_class_weights(val_class_accuracies,smoothing_factor=0)
 
         val_class_accuracies = {
             cls: (val_correct_counts[cls] / val_total_counts[cls] * 100 if val_total_counts[cls] > 0 else 0) for
