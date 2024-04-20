@@ -234,7 +234,9 @@ def main(args):
 
         # Print class-specific training accuracies
         print(f'Validation Class Accuracies: {val_class_accuracies}')
+        print('Mean performance:', sum(val_class_accuracies.values()) / len(val_class_accuracies))
         print(f'New class imbalance weights: {criterion.class_imbalance_weights}')
+        print('')
 
         current_lr = optimizer.param_groups[0]['lr']
         print(f"Current Learning Rate: {current_lr} \n")
