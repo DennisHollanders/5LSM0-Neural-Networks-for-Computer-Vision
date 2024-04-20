@@ -58,9 +58,7 @@ class Loss_Functions(nn.Module):
             else:
                 new_alpha = 1
             # Smoothing the transition of class weights
-            self.class_imbalance_weights[cls] = ((1 - smoothing_factor) * self.class_imbalance_weights[
-                cls] + smoothing_factor * new_alpha ) /2
-
+            self.class_imbalance_weights[cls] = new_alpha
     def focal_loss(self, preds, targets, alpha, gamma):
         """Calculate focal loss for each class"""
         ce_loss = torch.nn.functional.cross_entropy(preds, targets, reduction='none', ignore_index=self.ignore_index)
