@@ -15,19 +15,19 @@ def reshape_targets(targets):
     labels = utils.map_id_to_train_id(labels)
     return labels
 class Loss_Functions(nn.Module):
-    def __init__(self, num_classes,loss,balance_weight,ce_weight, ignore_index=255):
+    def __init__(self, num_classes, loss, balance_weight, ce_weight, ignore_index=255, alpha=None, gamma=2.0):
         super(Loss_Functions, self).__init__()
         self.num_classes = num_classes
         self.loss_type = loss
+        self.ignore_index = ignore_index
         self.smooth = 1
-        #self.weight = Weight
-        self.ignore_index =ignore_index
         self.epsilon = 1e-4
         self.class_imbalance_weights = torch.ones(num_classes)
-        #self.class_imbalance_weights = torch.tensor([0.2, 0.2,0.2,1,1,1,1,1,0.2,0.2,0.2,1,1,0.2,1,1,1,1,1])
         self.balance_weight = balance_weight
         self.ce_weight = ce_weight
         self.dice_jaccard_weight = 1.0 - ce_weight
+        self.alpha = alpha if alpha is not None else torch.ones(num_classes)
+        self.gamma = gamma
     def update_class_weights(self, accuracy_dict, smoothing_factor =0.1):
         # Update weights inversely proportional to the correctly classified percentages
         for cls, acc in accuracy_dict.items():
@@ -40,6 +40,13 @@ class Loss_Functions(nn.Module):
             # Normalizing weights to prevent scaling issues
             #total_weight = self.class_imbalance_weights.sum()
             #self.class_imbalance_weights /= total_weight
+
+    def focal_loss(self, preds, targets, alpha, gamma):
+        """Calculate focal loss for each class"""
+        ce_loss = torch.nn.functional.cross_entropy(preds, targets, reduction='none', ignore_index=self.ignore_index)
+        p_t = torch.exp(-ce_loss)
+        focal_loss = alpha * ((1 - p_t) ** gamma) * ce_loss
+        return focal_loss.mean()
 
     def dice_loss(self, pred_flat, target_flat, weight_applied_flat):
         # Weighting the intersection and the sums with the distance transform map
@@ -70,30 +77,28 @@ class Loss_Functions(nn.Module):
             raise ValueError("Segmentation targets only have a single channel, add distance transform and edge map")
         C = pred.shape[1]
         total_loss = 0.0
-        #self.class_imbalance_weights= self.class_imbalance_weights.to(device)
-        ce_loss = torch.nn.functional.cross_entropy(pred, target_segmentation, #weight=self.class_imbalance_weights,
-                                  ignore_index=self.ignore_index, reduction='none')
-        ce_loss = ce_loss.mean()
+        ce_loss = 0.0
         for c in range(C):
             if c != self.ignore_index:
-                    pred_flat = pred[:, c].contiguous().reshape(-1)
-                    target_flat = (target_segmentation == c).float().reshape(-1)
-                    if 0 <= self.balance_weight <= 1:
-                        imb_weight = self.class_imbalance_weights[c] * self.balance_weight
-                        dist_weight = distance_transform_map * (1 - self.balance_weight)
-                        weight_applied_flat = imb_weight + dist_weight
-                    else:
-                        weight_applied_flat = torch.ones_like(distance_transform_map)
+                pred_flat = pred[:, c].contiguous().reshape(-1)
+                target_flat = (target_segmentation == c).float().reshape(-1)
+                weight_applied_flat = self.class_imbalance_weights[c] * distance_transform_map
+                alpha_t = self.alpha[c]
+                fl_loss = self.focal_loss(pred, target_segmentation, alpha_t, self.gamma)
+                ce_loss += fl_loss
 
-                    if self.loss_type == 'Dice':
-                        loss = self.dice_loss(pred_flat, target_flat,weight_applied_flat)
-                    elif self.loss_type == 'Jaccard':
-                        loss = self.jaccard_loss(pred_flat, target_flat,weight_applied_flat)
-                    else:
-                        raise ValueError("Unsupported loss type. Use 'dice' or 'jaccard'.")
-                    total_loss += loss
-        combined_loss = ((self.dice_jaccard_weight * (total_loss/(C-1)) )+ (ce_loss * self.ce_weight)) / 2
+                # Dice/Jaccard loss
+                if self.loss_type == 'Dice':
+                    loss = self.dice_loss(pred_flat, target_flat, weight_applied_flat)
+                elif self.loss_type == 'Jaccard':
+                    loss = self.jaccard_loss(pred_flat, target_flat, weight_applied_flat)
+                else:
+                    raise ValueError("Unsupported loss type. Use 'dice' or 'jaccard'.")
+                total_loss += loss
+
+        combined_loss = ((self.dice_jaccard_weight * (total_loss / (C - 1))) + (ce_loss * self.ce_weight)) / 2
         return combined_loss
+
 
 def print_gradients(model):
     for name, parameter in model.named_parameters():
