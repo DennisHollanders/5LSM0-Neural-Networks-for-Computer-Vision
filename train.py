@@ -27,8 +27,8 @@ except ImportError:
 # Define the ranges for your hyperparameters
 learning_rates = [5e-4]
 batch_sizes = [8]
-CEbalances = [0.1,0.5, 0.9]
-weight_balances =  [0.1,0.5, 0.9]
+CEbalances = [0.1] #,0.5, 0.9]
+weight_balances =  [0.1] #,0.5, 0.9]
 loss = ['Jaccard','Dice']
 
 # Create a list of all possible combinations of hyperparameters
@@ -103,6 +103,8 @@ def main(args):
         #RandomFog(),
         #RandomBrightness(brightness_factor=(0.5, 1.5)),
         #RandomContrast(contrast_factor=(0.5, 1.5)),
+        #transforms.
+        #v2.RandomIoUCrop([min_scale, max_scale, ...])
         transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
         transforms.RandomAffine(degrees=(-10, 10), translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 10)),
         transforms.ToTensor(),

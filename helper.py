@@ -57,16 +57,6 @@ class Loss_Functions(nn.Module):
         jaccard_coef = (weighted_intersection + self.smooth) / (weighted_union + self.smooth)
         return 1 - jaccard_coef
 
-    def compute_ce_loss(self, pred, target):
-        # Flatten the input and target to compute the loss
-        pred_flat = pred.view(-1, pred.shape[1])
-        target_flat = target.view(-1)
-        # Apply weights
-        ce_weights = self.class_weights * self.weight_factor + (1 - self.weight_factor)
-        ce_loss = nn.functional.cross_entropy(pred_flat, target_flat, weight=ce_weights,
-                                              ignore_index=self.ignore_index, reduction='none')
-        return ce_loss.mean()
-
     def forward(self, pred, target):
         # if self.weight is not None:
         #     self.weight = self.weight.to(pred.device)
