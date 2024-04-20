@@ -26,9 +26,9 @@ class Loss_Functions(nn.Module):
         self.balance_weight = balance_weight
         self.ce_weight = ce_weight
         self.dice_jaccard_weight = 1.0 - ce_weight
+        self.gamma = gamma if isinstance(gamma, torch.Tensor) else torch.tensor([gamma] * num_classes)
         self.alpha = alpha if alpha is not None else torch.ones(num_classes)
-        self.gamma = gamma
-    def update_class_weights(self, accuracy_dict, smoothing_factor =0.1):
+    """def update_class_weights(self, accuracy_dict, smoothing_factor =0.1):
         # Update weights inversely proportional to the correctly classified percentages
         for cls, acc in accuracy_dict.items():
             if acc > 0:
@@ -40,6 +40,26 @@ class Loss_Functions(nn.Module):
             # Normalizing weights to prevent scaling issues
             #total_weight = self.class_imbalance_weights.sum()
             #self.class_imbalance_weights /= total_weight
+    """
+
+    def update_class_weights(self, accuracy_dict, smoothing_factor=0.1):
+        # Constants for the quadratic gamma function
+        a = 1 / 2500
+        b = -2 / 25
+        c = 5
+        for cls, acc in accuracy_dict.items():
+            # Calculate new gamma value using the quadratic function
+            new_gamma = a * (acc ** 2) + b * acc + c
+            self.gamma[cls] = new_gamma
+            # Update class weights based on accuracy
+            if acc > 0:
+                new_alpha = 1 - (acc / 100)
+                self.alpha[cls] = new_alpha
+            else:
+                new_alpha = 1
+            # Smoothing the transition of class weights
+            self.class_imbalance_weights[cls] = ((1 - smoothing_factor) * self.class_imbalance_weights[
+                cls] + smoothing_factor * new_alpha ) /2
 
     def focal_loss(self, preds, targets, alpha, gamma):
         """Calculate focal loss for each class"""
@@ -77,32 +97,30 @@ class Loss_Functions(nn.Module):
             raise ValueError("Segmentation targets only have a single channel, add distance transform and edge map")
         C = pred.shape[1]
         total_loss = 0.0
-        ce_loss = 0.0
+        fl_loss = 0.0
         for c in range(C):
             if c != self.ignore_index:
                 pred_flat = pred[:, c].contiguous().reshape(-1)
                 target_flat = (target_segmentation == c).float().reshape(-1)
                 if 0 <= self.balance_weight <= 1:
+                    print('yes weight balance = ',self.balance_weight, self.ce_weight)
                     weight_applied_flat = ((distance_transform_map * self.balance_weight) + self.class_imbalance_weights[c]*(1-self.balance_weight))/2
                 else:
-                    weight_applied_flat = 1
-                alpha_t = self.alpha[c]
-                fl_loss = self.focal_loss(pred, target_segmentation, alpha_t, self.gamma)
-                ce_loss += fl_loss
-
+                    weight_applied_flat = torch.ones_like(distance_transform_map)
+                    print('no weight balance = ', self.balance_weight, self.ce_weight)
+                fl_loss += self.focal_loss(pred, target_segmentation, self.alpha[c], self.gamma[c])
                 # Dice/Jaccard loss
                 if self.loss_type == 'Dice':
-                    loss = self.dice_loss(pred_flat, target_flat, weight_applied_flat)
+                    total_loss += self.dice_loss(pred_flat, target_flat, weight_applied_flat)
                 elif self.loss_type == 'Jaccard':
-                    loss = self.jaccard_loss(pred_flat, target_flat, weight_applied_flat)
+                    total_loss += self.jaccard_loss(pred_flat, target_flat, weight_applied_flat)
                 else:
                     raise ValueError("Unsupported loss type. Use 'dice' or 'jaccard'.")
-                total_loss += loss
         #print('weight_applied:',np.unique(weight_applied_flat))
         #print('Dice/Jaccard:',(total_loss / (C - 1)))
         #print('ce_loss', ce_loss/(C-1))
 
-        combined_loss = ((self.dice_jaccard_weight * (total_loss / (C - 1))) + ((ce_loss/(C-1)) * self.ce_weight)) / 2
+        combined_loss = ((self.dice_jaccard_weight * (total_loss / (C - 1))) + ((fl_loss/(C-1)) * self.ce_weight)) / 2
         #print('combined loss', combined_loss)
         return combined_loss
 

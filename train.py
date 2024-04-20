@@ -27,9 +27,9 @@ except ImportError:
 # Define the ranges for your hyperparameters
 learning_rates = [5e-4]
 batch_sizes = [8]
-CEbalances = [0.0]              #,0.5, 0.9]
-weight_balances =  [2]          #,0.5, 0.9]
-loss = ['Jaccard','Dice']
+CEbalances = [0]              #,0.5, 0.9]
+weight_balances = [2]          #,0.5, 0.9]
+loss = ['Jaccard' ] # ,'Dice']
 
 # Create a list of all possible combinations of hyperparameters
 hyperparameter_combinations = list(itertools.product(
@@ -135,7 +135,7 @@ def main(args):
     model = Model()
     model.to(device)
     initialize_weights(model)
-    criterion = Loss_Functions(args.num_classes,args.loss,0.5, 0.5,ignore_index=255)
+    criterion = Loss_Functions(args.num_classes,args.loss,args.weight_balance , args.CEbalance,ignore_index=255)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate,  betas=(0.95, 0.999), eps=1e-08, weight_decay=1e-4)
     scheduler = ExponentialLR(optimizer, gamma=0.95)
 
