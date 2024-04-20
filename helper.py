@@ -82,7 +82,10 @@ class Loss_Functions(nn.Module):
             if c != self.ignore_index:
                 pred_flat = pred[:, c].contiguous().reshape(-1)
                 target_flat = (target_segmentation == c).float().reshape(-1)
-                weight_applied_flat = self.class_imbalance_weights[c] * distance_transform_map
+                if 0 <= self.balance_weight <= 1:
+                    weight_applied_flat = ((distance_transform_map * self.balance_weight) + self.class_imbalance_weights[c]*(1-self.balance_weight))/2
+                else:
+                    weight_applied_flat = 1
                 alpha_t = self.alpha[c]
                 fl_loss = self.focal_loss(pred, target_segmentation, alpha_t, self.gamma)
                 ce_loss += fl_loss
@@ -95,8 +98,12 @@ class Loss_Functions(nn.Module):
                 else:
                     raise ValueError("Unsupported loss type. Use 'dice' or 'jaccard'.")
                 total_loss += loss
+        #print('weight_applied:',np.unique(weight_applied_flat))
+        #print('Dice/Jaccard:',(total_loss / (C - 1)))
+        #print('ce_loss', ce_loss/(C-1))
 
-        combined_loss = ((self.dice_jaccard_weight * (total_loss / (C - 1))) + (ce_loss * self.ce_weight)) / 2
+        combined_loss = ((self.dice_jaccard_weight * (total_loss / (C - 1))) + ((ce_loss/(C-1)) * self.ce_weight)) / 2
+        #print('combined loss', combined_loss)
         return combined_loss
 
 
