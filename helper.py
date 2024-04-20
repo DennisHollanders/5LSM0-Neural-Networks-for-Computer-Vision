@@ -79,12 +79,10 @@ class Loss_Functions(nn.Module):
                     pred_flat = pred[:, c].contiguous().reshape(-1)
                     target_flat = (target_segmentation == c).float().reshape(-1)
                     if 0 <= self.balance_weight <= 1:
-                        # If balance_weight is between 0 and 1, calculate a blend of the weights
                         imb_weight = self.class_imbalance_weights[c] * self.balance_weight
                         dist_weight = distance_transform_map * (1 - self.balance_weight)
                         weight_applied_flat = imb_weight + dist_weight
                     else:
-                        # If balance_weight is outside the range of 0 to 1, use uniform weights
                         weight_applied_flat = torch.ones_like(distance_transform_map)
 
                     if self.loss_type == 'Dice':

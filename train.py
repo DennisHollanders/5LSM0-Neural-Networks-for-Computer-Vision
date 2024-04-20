@@ -27,8 +27,8 @@ except ImportError:
 # Define the ranges for your hyperparameters
 learning_rates = [5e-4]
 batch_sizes = [8]
-CEbalances = [0.1] #,0.5, 0.9]
-weight_balances =  [0.1] #,0.5, 0.9]
+CEbalances = [0.0] #,0.5, 0.9]
+weight_balances =  [2] #,0.5, 0.9]
 loss = ['Jaccard','Dice']
 
 # Create a list of all possible combinations of hyperparameters
