@@ -103,11 +103,11 @@ class Loss_Functions(nn.Module):
                 pred_flat = pred[:, c].contiguous().reshape(-1)
                 target_flat = (target_segmentation == c).float().reshape(-1)
                 if 0 <= self.balance_weight <= 1:
-                    print('yes weight balance = ',self.balance_weight, self.ce_weight)
+                    #print('yes weight balance = ',self.balance_weight, self.ce_weight)
                     weight_applied_flat = ((distance_transform_map * self.balance_weight) + self.class_imbalance_weights[c]*(1-self.balance_weight))/2
                 else:
                     weight_applied_flat = torch.ones_like(distance_transform_map)
-                    print('no weight balance = ', self.balance_weight, self.ce_weight)
+                    #print('no weight balance = ', self.balance_weight, self.ce_weight)
                 fl_loss += self.focal_loss(pred, target_segmentation, self.alpha[c], self.gamma[c])
                 # Dice/Jaccard loss
                 if self.loss_type == 'Dice':
