@@ -1,6 +1,6 @@
 from torchvision.datasets import Cityscapes
 from torchvision import transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from helper import *
 from model import Model
 from torchvision.transforms import Lambda
@@ -12,10 +12,14 @@ try:
 except ImportError:
     pass
 
-model_path = 'models/model_5920006.pth'
+# choose model to evaluate
+model_path = 'models/model_5994545.pth'
 model_additional = 'models/model_additional_5869017.pth'
 
 def plot_losses(epoch_data):
+    """
+    Plot los trajectory over epochs
+    """
     train_losses = epoch_data['loss']
     val_losses = epoch_data['validation_loss']
     plt.figure(figsize=(15, 5))
@@ -28,41 +32,16 @@ def plot_losses(epoch_data):
     plt.show()
 
 def main():
+    """
+    Initialize the model and dataloaders
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    # load model state
     model = Model()
     state = torch.load(model_path, map_location=device)
-    additonal_info = torch.load(model_additional, map_location=device)
     model.load_state_dict(state)
-    # state = torch.load(model_path, map_location=device)
-    # model.load_state_dict(state)
-    state = torch.load(model_path, map_location=device)
-    # model.load_state_dict(state)
     model.to(device)
-
-    # # Print model summary to check parameter sizes and types
-    # print("Model Summary:")
-    # for name, param in model.named_parameters():
-    #     print(f"{name}: {param.size()}, dtype={param.dtype}")
-    #
-    # # Check if any additional items are saved in the state that are not needed
-    # print("\nItems in saved state:")
-    # for key in state.keys():
-    #     print(f"{key}: type({type(state[key])})")
-    #
-    # # Extract and plot the training and validation losses if available
-    # if 'epoch_data' in state['additional_info']:
-    #     epoch_data = state['additional_info']['epoch_data']
-    #     plot_losses(epoch_data)
-    #
-    # # Assuming loss criterion details are required for initialization or information
-    # if 'loss_criterion_state_dict' in state['additional_info']:
-    #     # Initialize your loss criterion here if needed
-    #     loss_criterion = nn.YourLossClass()  # replace 'YourLossClass' with your actual class
-    #     loss_criterion.load_state_dict(state['additional_info']['loss_criterion_state_dict'])
-    #     print("\nLoaded Loss Criterion State.")
-    #print(epoch_data,loss_criterion)
-    #plot_losses(epoch_data)
 
     # Prepare the dataset and DataLoader
     transform = transforms.Compose([
@@ -75,18 +54,70 @@ def main():
         transforms.ToTensor(),
         Lambda(reshape_targets),
         Lambda(edge_and_distance_transform),
-        # OneHotEncode(num_classes=args.num_classes),
     ])
 
-    dataset = Cityscapes(root='City_Scapes/', split='val', mode='fine', target_type='semantic',
+    full_dataset = Cityscapes(root='City_Scapes/', split='val', mode='fine', target_type='semantic',
                          transform=transform, target_transform=target_transform)
-    loader = DataLoader(dataset, batch_size=4, shuffle=False)
+    subset_size = int(0.2 * len(full_dataset))
+    # take small subset of the data
+    indices = torch.randperm(len(full_dataset))[:subset_size]
+    dataset_subset = Subset(full_dataset, indices)
+    loader = DataLoader(dataset_subset, batch_size=4, shuffle=False)
 
     # Visualize predictions
-    visualize_segmentation(model,loader)
+    visualize_segmentation(model, loader, device)
 
 
-def visualize_segmentation(model, dataloader, num_examples=5):
+def visualize_segmentation(model, dataloader, device, num_examples=1):
+    model.eval()
+    # create accuracy containers
+    total_class_correct = np.zeros(19)
+    total_class_pixels = np.zeros(19)
+    edge_accuracies = []
+
+    # plots the models performance
+    visualize_predictions(model, dataloader)
+
+    with torch.no_grad():
+        for i, (images, targets) in enumerate(dataloader):
+            images = images.to(device)
+            targets_full = targets
+            targets = targets[:,0,:,:].to(device)
+            outputs = model(images)
+            predictions = torch.argmax(nn.functional.softmax(outputs, dim=1), dim=1)
+
+            # Compute class-specific accuracy
+            for cls in range(19):
+                cls_mask = targets == cls
+                cls_correct = (predictions == cls) & cls_mask
+                total_class_correct[cls] += cls_correct.sum().item()
+                total_class_pixels[cls] += cls_mask.sum().item()
+
+            # Compute accuracy near edges if necessary
+            edge_accuracy = calculate_accuracy_near_edges(predictions, targets_full)
+            edge_accuracies.append(edge_accuracy)
+
+            # plots the target channels
+            if i < num_examples:
+                visualize_edge_masks(targets_full,4)
+
+    # Calculate per-class accuracies
+    class_accuracies = (total_class_correct / total_class_pixels) * 100
+    mean_performance = np.nanmean(class_accuracies)  # Handling classes with zero pixels in samples
+
+    # Calculate Class Imbalance Score (CI)
+    sorted_accuracies = np.sort(class_accuracies)
+    ci_score = np.mean(sorted_accuracies[:10])  # Average of ten worst-performing classes
+
+    # Calculate Edge Performance (EP)
+    ep_score = np.mean(edge_accuracies)
+
+    print(f"Mean Performance per Class: {class_accuracies}")
+    print(f"Overall Mean Performance: {mean_performance:.2f}%")
+    print(f"Class Imbalance Score (CI): {ci_score:.2f}%")
+    print(f"Edge Performance (EP): {ep_score:.2f}%")
+
+def visualize_predictions(model, dataloader, num_examples=5):
     """
     Visualizes segmentation results from a given model using a dataloader.
 
@@ -132,7 +163,8 @@ def visualize_segmentation(model, dataloader, num_examples=5):
                 pred_mask_rgb = mask_to_rgb(predicted[j], colors)
 
                 # Calculate error mask only for non-ignored pixels
-                error_mask = ((mask_rgb != pred_mask_rgb) & (mask_rgb != 255)).astype(np.uint8) *255
+                error_mask = ((mask_rgb != pred_mask_rgb) & (mask_rgb != 255)).any(axis=2).astype(np.uint8) *255
+                #error_mask = (mask_rgb != pred_mask_rgb).astype(np.uint8) * 255
 
                 # Original Image
                 plt.subplot(num_examples, 4, j * 4 + 1)
@@ -154,13 +186,14 @@ def visualize_segmentation(model, dataloader, num_examples=5):
 
                 # Error Mask
                 plt.subplot(num_examples, 4, j * 4 + 4)
-                plt.imshow(error_mask, cmap='binary_r')
+                plt.imshow(error_mask, cmap='binary')
                 plt.title("Error Highlight")
                 plt.axis('off')
 
-            plt.subplots_adjust(wspace=0.01, hspace=0.1)
-            plt.tight_layout()
+            plt.subplots_adjust(wspace=0, hspace=0)
+            plt.tight_layout(pad=0)
             plt.show()
+
 
 def renormalize_image(image):
     """
@@ -204,34 +237,61 @@ def mask_to_rgb(mask, class_to_color):
 
     return rgb_mask
 
+
 def visualize_edge_masks(masks, num_examples):
-    plt.figure(figsize=(15, 10))
-    masks = masks.numpy()
-    for j in range(4):
-        #image = renormalize_image(images[j].transpose(1, 2, 0))
-        #mask_rgb = mask_to_rgb(masks[j], colors)
-        #pred_mask_rgb = mask_to_rgb(predicted[j], colors)
-        # Original Image
-        plt.subplot(num_examples, 3, j * 3 + 1)
-        plt.imshow(masks[j,0,:,:])
-        plt.title('Mask')
-        plt.axis('off')
+    """
+    Creates a plot of the target channel maps
+    """
+    plt.figure(figsize=(20, 15))
+    colors, class_names = names_colors_classes()
+
+    for j in range(min(num_examples, masks.shape[0])):
+        # extract maps
+        ground_truth_mask = masks[j, 0, :, :]
+        edge_mask = masks[j, 1, :, :]
+        distance_transform = masks[j, 2, :, :]
+        mask_rgb = mask_to_rgb(ground_truth_mask, colors)
 
         # Ground Truth Mask
-        plt.subplot(num_examples, 3, j * 3 + 2)
-        plt.imshow(masks[j,1,:,:], cmap='gray')
-        plt.title('Edge mask')
+        plt.subplot(num_examples, 3, j * 3 + 1)
+        plt.imshow(mask_rgb)
+        plt.title('Ground Truth Mask')
         plt.axis('off')
 
-        # Model's Prediction
-        plt.subplot(num_examples, 3, j * 3 + 3)
-        plt.imshow(masks[j,2,:,:])
-        plt.title("Distance transform map")
+        # Edge Mask
+        plt.subplot(num_examples, 3, j * 3 + 2)
+        plt.imshow(edge_mask, cmap='gray')
+        plt.title('Edge Mask')
         plt.axis('off')
-    plt.subplots_adjust(wspace=0.05, hspace=0.1)
-    plt.tight_layout()
+
+        # Distance Transform Map
+        plt.subplot(num_examples, 3, j * 3 + 3)
+        plt.imshow(distance_transform,cmap='viridis')
+        plt.title("Distance Transform Map")
+        plt.axis('off')
+
+    plt.subplots_adjust(wspace=0, hspace=0)
+    plt.tight_layout(pad=0)
     plt.show()
+
+
+def calculate_accuracy_near_edges(predictions, targets, threshold=0.8):
+    """
+    Calculate the accuracy of predictions near the edges of the targets, using the distance transform map.
+    """
+    # Ensure that the distance transform map is accessed correctly, which is assumed to be in the third channel
+    distance_transform = targets[:, 2, :, :]  # Accessing the third channel
+
+    # Create a mask where the distance transform values are greater than the specified threshold
+    near_edge_mask = distance_transform > threshold
+
+    # Calculate the accuracy only on these near-edge pixels
+    correct_near_edge = (predictions[near_edge_mask] == targets[:, 0, :, :][near_edge_mask]).sum()
+    total_near_edge = near_edge_mask.sum()
+    return (correct_near_edge / total_near_edge).item() * 100 if total_near_edge > 0 else 0
+
 
 
 if __name__ == "__main__":
     main()
+
